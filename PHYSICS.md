@@ -68,11 +68,15 @@ When available, the visualizer uses OpenMX LDA radial wavefunctions and occupanc
 
 Dots show Monte Carlo samples. Bubbles reconstruct a smooth surface from those samples. When a phase sign is defined (single orbital and superposition), positive regions are shown in red and negative regions in blue. Density-only modes do not have a sign, so only one surface is shown.
 
-## 9. Sampling Method
+## 9. Phase Visualization
+
+Phase is not directly observable in |psi|^2, but it is useful for understanding interference and orbital symmetry. In dot mode, the visualizer can color points by the complex phase angle arg(psi). For real orbitals, the phase is either 0 or pi, producing the familiar red/blue lobes. For complex orbitals and superposition, phase varies smoothly with position and time.
+
+## 10. Sampling Method
 
 Sampling uses rejection sampling in spherical coordinates. Radial samples are drawn from a CDF built from |R_nl|^2 and r^2. Angular samples are accepted according to |Y_lm|^2.
 
-## 10. Fallbacks And Approximations
+## 11. Fallbacks And Approximations
 
 - PSLibrary data is used as a fallback for single-orbital mode.
 - Superposition uses hydrogenic orbitals for any element and scales coordinates by 1/Z.

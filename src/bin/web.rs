@@ -41,6 +41,7 @@ struct SampleQuery {
     animated: Option<bool>,
     bubble: Option<bool>,
     basis: Option<String>,
+    color_mode: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -67,6 +68,7 @@ struct SampleResponse {
     psi2: Option<Vec<[f32; 2]>>,
     delta_e: Option<f32>,
     signs: Option<Vec<i8>>,
+    phases: Option<Vec<f32>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -135,45 +137,70 @@ const INDEX_HTML: &str = r##"<!doctype html>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; background: #0b0c10; color: #e6e6e6; font-family: "Space Grotesk", "Segoe UI", sans-serif; }
+      :root {
+        --bg: #0a0c12;
+        --bg-2: #0c111a;
+        --panel: rgba(14, 18, 26, 0.92);
+        --panel-border: #1f2732;
+        --text: #e7edf5;
+        --muted: #9aa6b6;
+        --muted-2: #7b8796;
+        --accent: #46d7c6;
+        --accent-2: #f7b059;
+        --accent-3: #4aa3ff;
+      }
+      html, body { margin: 0; padding: 0; height: 100%; background: radial-gradient(1200px 800px at 20% 10%, #111727 0%, var(--bg) 55%, #090b10 100%); color: var(--text); font-family: "Space Grotesk", "Segoe UI", sans-serif; }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+        background-size: 48px 48px;
+        opacity: 0.15;
+        pointer-events: none;
+      }
       canvas { display: block; }
-      #panel { position: absolute; top: 12px; left: 12px; width: 340px; background: rgba(10,12,16,0.9); padding: 12px; border: 1px solid #2a2f36; border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); }
-      #infoButton { position: absolute; top: 12px; right: 12px; background: #11151b; border: 1px solid #2a2f36; color: #e6e6e6; border-radius: 8px; padding: 6px 10px; font-size: 12px; text-decoration: none; }
-      #infoButton:hover { border-color: #3c6a9e; }
-      .brand { font-size: 16px; font-weight: 600; letter-spacing: 0.02em; }
-      .section { margin-top: 12px; padding-top: 10px; border-top: 1px solid #1f2630; }
-      .section:first-of-type { margin-top: 8px; padding-top: 0; border-top: none; }
-      .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #9aa3ad; margin-bottom: 6px; }
-      .row { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-      .row label { font-size: 11px; color: #a7b0ba; min-width: 24px; }
-      input, select { background: #0f141b; color: #e6e6e6; border: 1px solid #2a2f36; border-radius: 6px; padding: 4px 6px; font-size: 12px; }
-      input[type="number"] { width: 58px; }
-      select { flex: 1; min-width: 120px; }
-      button { background: #11151b; color: #e6e6e6; border: 1px solid #2a2f36; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
-      button.primary { background: #1a2736; border-color: #3c6a9e; }
+      #panel { position: absolute; top: 16px; left: 16px; width: 360px; background: var(--panel); padding: 14px; border: 1px solid var(--panel-border); border-radius: 14px; box-shadow: 0 18px 48px rgba(0,0,0,0.45); backdrop-filter: blur(6px); }
+      #infoButton { position: absolute; top: 16px; right: 16px; background: #111722; border: 1px solid #2b3545; color: var(--text); border-radius: 10px; padding: 8px 12px; font-size: 12px; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
+      #infoButton:hover { border-color: var(--accent-3); color: #ffffff; }
+      .brand { font-size: 17px; font-weight: 600; letter-spacing: 0.04em; display: flex; align-items: center; gap: 8px; }
+      .brand::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(120deg, var(--accent), var(--accent-2)); display: inline-block; box-shadow: 0 0 12px rgba(70,215,198,0.6); }
+      .section { margin-top: 14px; padding-top: 12px; border-top: 1px solid #1a2230; }
+      .section:first-of-type { margin-top: 10px; padding-top: 0; border-top: none; }
+      .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted-2); margin-bottom: 6px; }
+      .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+      .row label { font-size: 11px; color: var(--muted); min-width: 40px; }
+      input, select { background: #0e141f; color: var(--text); border: 1px solid #263042; border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+      input[type="number"] { width: 62px; }
+      select { flex: 1; min-width: 140px; }
+      input[type="range"] { accent-color: var(--accent); }
+      button { background: #111a28; color: var(--text); border: 1px solid #2a364a; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; }
+      button.primary { background: linear-gradient(120deg, #1c2c3d, #1f3b52); border-color: #3f6f9d; }
       button:disabled { opacity: 0.6; cursor: default; }
-      #controls { margin-top: 6px; font-size: 12px; color: #9aa3ad; }
-      #status { margin-top: 8px; font-size: 12px; color: #b2bac4; }
-      .hint { font-size: 11px; color: #7f8895; margin-top: 6px; }
-      #animControls { margin-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c9d1d9; }
+      #controls { margin-top: 6px; font-size: 12px; color: var(--muted); }
+      #status { margin-top: 10px; font-size: 12px; color: #b7c3d3; }
+      .hint { font-size: 11px; color: var(--muted-2); margin-top: 6px; }
+      #animControls { margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: #c9d1d9; }
       #animControls input[type="range"] { width: 140px; }
-      #mixRow { margin-top: 6px; display: none; align-items: center; gap: 8px; font-size: 12px; color: #c9d1d9; flex-wrap: wrap; }
+      #mixRow { margin-top: 8px; display: none; align-items: center; gap: 8px; font-size: 12px; color: #c9d1d9; flex-wrap: wrap; }
       #mixRow input[type="range"] { width: 140px; }
-      #orbitalRow, #superRow { margin-top: 6px; display: none; align-items: center; gap: 6px; font-size: 12px; color: #c9d1d9; flex-wrap: wrap; }
+      #orbitalRow, #superRow { margin-top: 8px; display: none; align-items: center; gap: 8px; font-size: 12px; color: #c9d1d9; flex-wrap: wrap; }
       #superRow input[type="number"] { width: 58px; }
       .dropdown { position: relative; }
-      .dropdown-btn { width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; }
-      .dropdown-panel { position: absolute; left: 0; right: 0; top: 100%; margin-top: 6px; background: #0f1218; border: 1px solid #2a2f36; border-radius: 8px; padding: 8px; max-height: 380px; overflow: auto; display: none; z-index: 5; }
+      .dropdown-btn { width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+      .dropdown-panel { position: absolute; left: 0; right: 0; top: 100%; margin-top: 8px; background: #0f141f; border: 1px solid #263042; border-radius: 12px; padding: 10px; max-height: 380px; overflow: auto; display: none; z-index: 5; box-shadow: 0 14px 30px rgba(0,0,0,0.4); }
       .dropdown-panel.open { display: block; }
-      #elementSearch { width: 100%; margin-bottom: 6px; }
+      #elementSearch { width: 100%; margin-bottom: 8px; }
       #periodicGrid { display: grid; grid-template-columns: repeat(18, minmax(0, 1fr)); gap: 4px; }
-      .series-label { font-size: 11px; color: #9aa3ad; margin-top: 8px; margin-bottom: 4px; }
+      .series-label { font-size: 11px; color: var(--muted-2); margin-top: 10px; margin-bottom: 6px; }
       .series-grid { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 4px; }
-      .periodic-cell { height: 30px; display: flex; align-items: center; justify-content: center; font-size: 11px; border-radius: 6px; }
-      .el-btn { background: #11151b; border: 1px solid #2a2f36; color: #e6e6e6; cursor: pointer; }
-      .el-btn:hover { border-color: #3c6a9e; }
-      .el-btn.active { background: #1e2a3a; border-color: #3c6a9e; color: #cbe3ff; }
-      .el-empty { border: 1px dashed #1e252f; color: #3a4450; }
+      .periodic-cell { height: 30px; display: flex; align-items: center; justify-content: center; font-size: 11px; border-radius: 8px; }
+      .el-btn { background: #121a27; border: 1px solid #2a364a; color: var(--text); cursor: pointer; }
+      .el-btn:hover { border-color: var(--accent-3); }
+      .el-btn.active { background: #1c2b3d; border-color: var(--accent-3); color: #d8ebff; }
+      .el-empty { border: 1px dashed #233043; color: #3a4450; }
     </style>
   </head>
   <body>
@@ -185,6 +212,13 @@ const INDEX_HTML: &str = r##"<!doctype html>
         <select id="renderMode">
           <option value="dots" selected>Dots</option>
           <option value="bubbles">Bubbles</option>
+        </select>
+      </div>
+      <div id="dotColorRow" class="row">
+        <label>Dot color</label>
+        <select id="dotColorMode">
+          <option value="radial" selected>Radial</option>
+          <option value="phase">Phase</option>
         </select>
       </div>
       <div id="bubbleThresholdRow" class="row" style="display: none;">
@@ -317,6 +351,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const mixVal = document.getElementById("mixVal");
       const modeSelect = document.getElementById("mode");
       const renderModeSelect = document.getElementById("renderMode");
+      const dotColorSelect = document.getElementById("dotColorMode");
+      const dotColorRow = document.getElementById("dotColorRow");
       const valenceRow = document.getElementById("valenceRow");
       const valenceStyleSelect = document.getElementById("valenceStyle");
       const basisRow = document.getElementById("basisRow");
@@ -400,6 +436,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const bubbleKernelSigma = 0.45;
       let bubbleIsoFraction = 0.45;
       const bubbleUpdateInterval = 60;
+      let dotColorMode = "radial";
 
       const bubbleKernel = (() => {
         const entries = [];
@@ -452,6 +489,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
         localStorage.setItem("renderMode", renderMode);
         const showBubbles = renderMode === "bubbles";
         bubbleThresholdRow.style.display = showBubbles ? "flex" : "none";
+        dotColorRow.style.display = showBubbles ? "none" : "flex";
+        dotColorSelect.disabled = showBubbles;
+        updateModeUI();
         if (points) {
           points.visible = !showBubbles;
         }
@@ -596,6 +636,14 @@ const INDEX_HTML: &str = r##"<!doctype html>
         fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
       });
 
+      dotColorMode = localStorage.getItem("dotColorMode") || "radial";
+      dotColorSelect.value = dotColorMode;
+      dotColorSelect.addEventListener("change", () => {
+        dotColorMode = dotColorSelect.value;
+        localStorage.setItem("dotColorMode", dotColorMode);
+        fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
+      });
+
       const storedIso = localStorage.getItem("bubbleIso");
       if (storedIso) {
         const parsed = Number(storedIso);
@@ -699,8 +747,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const mode = modeSelect.value;
         const orbitalMode = mode === "orbital";
         const superMode = mode === "superposition";
+        const showBubbles = renderMode === "bubbles";
         valenceRow.style.display = mode === "valence" ? "flex" : "none";
-        basisRow.style.display = orbitalMode || superMode ? "flex" : "none";
+        basisRow.style.display = (orbitalMode || superMode) && showBubbles ? "flex" : "none";
         nInput.disabled = !(orbitalMode || superMode);
         lInput.disabled = !(orbitalMode || superMode);
         mInput.disabled = !(orbitalMode || superMode);
@@ -1161,6 +1210,30 @@ const INDEX_HTML: &str = r##"<!doctype html>
         }
       }
 
+      function hsvToRgb(h, s, v) {
+        const i = Math.floor(h * 6.0);
+        const f = h * 6.0 - i;
+        const p = v * (1.0 - s);
+        const q = v * (1.0 - f * s);
+        const t = v * (1.0 - (1.0 - f) * s);
+        switch (i % 6) {
+          case 0: return [v, t, p];
+          case 1: return [q, v, p];
+          case 2: return [p, v, t];
+          case 3: return [p, q, v];
+          case 4: return [t, p, v];
+          case 5: return [v, p, q];
+          default: return [v, t, p];
+        }
+      }
+
+      function colorForPhase(phase) {
+        const t = (phase + Math.PI) / (2.0 * Math.PI);
+        const h = ((t % 1) + 1) % 1;
+        const [r, g, b] = hsvToRgb(h, 0.95, 0.95);
+        return new THREE.Color(r, g, b);
+      }
+
       function updateSuperpositionColors() {
         if (!superPsi || !colorAttr || !baseColors || !superProb) {
           return;
@@ -1202,11 +1275,46 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const colors = colorAttr.array;
         for (let i = 0; i < count; i++) {
           const baseIdx = i * 3;
-        const norm = Math.pow(superProb[i] * invMax, 0.5);
-        const brightness = 0.05 + 0.95 * norm;
+          const norm = Math.pow(superProb[i] * invMax, 0.5);
+          const brightness = 0.05 + 0.95 * norm;
           colors[baseIdx + 0] = baseColors[baseIdx + 0] * brightness;
           colors[baseIdx + 1] = baseColors[baseIdx + 1] * brightness;
           colors[baseIdx + 2] = baseColors[baseIdx + 2] * brightness;
+        }
+        colorAttr.needsUpdate = true;
+      }
+
+      function updateSuperpositionPhaseColors() {
+        if (!superPsi || !colorAttr) {
+          return;
+        }
+        const psi1 = superPsi.psi1;
+        const psi2 = superPsi.psi2;
+        const deltaE = superPsi.deltaE || 0;
+        const isDegenerate = Math.abs(deltaE) < 1e-6;
+        const loopPeriod = 6.0;
+        const phaseSpeed = isDegenerate ? (Math.PI * 2.0 / loopPeriod) : deltaE;
+        const phase = phaseSpeed * superpositionTime;
+        const phaseRe = Math.cos(phase);
+        const phaseIm = -Math.sin(phase);
+        const colors = colorAttr.array;
+        const count = colors.length / 3;
+        for (let i = 0; i < count; i++) {
+          const idx2 = i * 2;
+          const psi1Re = psi1[idx2 + 0];
+          const psi1Im = psi1[idx2 + 1];
+          const psi2ReBase = psi2[idx2 + 0];
+          const psi2ImBase = psi2[idx2 + 1];
+          const psi2Re = psi2ReBase * phaseRe - psi2ImBase * phaseIm;
+          const psi2Im = psi2ReBase * phaseIm + psi2ImBase * phaseRe;
+          const re = psi1Re + psi2Re;
+          const im = psi1Im + psi2Im;
+          const phi = Math.atan2(im, re);
+          const c = colorForPhase(phi);
+          const baseIdx = i * 3;
+          colors[baseIdx + 0] = c.r;
+          colors[baseIdx + 1] = c.g;
+          colors[baseIdx + 2] = c.b;
         }
         colorAttr.needsUpdate = true;
       }
@@ -1222,11 +1330,12 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const mode = modeSelect.value;
         const valenceStyle = valenceStyleSelect.value;
         const wantMorph = animateEnabled && mode === "superposition";
-        const wantPsi = false;
+        const wantPhaseMode = renderMode === "dots" && dotColorMode === "phase";
+        const wantPsi = animateEnabled && mode === "superposition" && wantPhaseMode;
         const wantBubbles = renderMode === "bubbles";
         let effectiveCount = count;
         if (wantMorph) {
-          effectiveCount = Math.min(count, 20000);
+          effectiveCount = count;
         }
         let n2 = Number(n2Input.value);
         let l2 = Number(l2Input.value);
@@ -1244,7 +1353,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
         try {
           statusEl.textContent = forceTime !== null ? "Animating..." : "Sampling...";
           setActiveElementByZ(z);
-          const params = new URLSearchParams({ n, l, m, n2, l2, m2, z, count: effectiveCount, max, mode, mix, t, valence_style: valenceStyle, animated: wantPsi, bubble: wantBubbles, basis: basisSelect.value });
+          const basisMode = renderMode === "bubbles" ? basisSelect.value : "complex";
+          const params = new URLSearchParams({ n, l, m, n2, l2, m2, z, count: effectiveCount, max, mode, mix, t, valence_style: valenceStyle, animated: wantPsi, bubble: wantBubbles, basis: basisMode, color_mode: wantPhaseMode ? "phase" : "radial" });
           const res = await fetch(`/samples?${params.toString()}`);
           if (!res.ok) {
             statusEl.textContent = "Error: " + res.status;
@@ -1267,7 +1377,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
           : (data.source === "pslibrary" ? "PSlibrary" : "Hydrogenic");
         const note = data.note ? ` | ${data.note}` : "";
         const modeLabel = data.mode || mode;
-        const basisLabel = (basisSelect.value === "real" && (modeLabel === "orbital" || modeLabel === "superposition"))
+        const basisLabel = (renderMode === "bubbles" && basisSelect.value === "real" && (modeLabel === "orbital" || modeLabel === "superposition"))
           ? " | real basis"
           : "";
         let detail = "total density";
@@ -1326,13 +1436,21 @@ const INDEX_HTML: &str = r##"<!doctype html>
 
         const positions = new Float32Array(data.samples.length * 3);
         const colors = new Float32Array(data.samples.length * 3);
+        const usePhase = dotColorMode === "phase"
+          && Array.isArray(data.phases)
+          && data.phases.length === data.samples.length;
         for (let i = 0; i < data.samples.length; i++) {
           const p = data.samples[i];
           positions[i * 3 + 0] = p[0] * 0.1;
           positions[i * 3 + 1] = p[1] * 0.1;
           positions[i * 3 + 2] = p[2] * 0.1;
-          const dist = Math.sqrt(p[0]*p[0] + p[1]*p[1] + p[2]*p[2]) * 0.1;
-          const c = colorForDistance(dist, data.max_radius * 0.1);
+          let c;
+          if (usePhase) {
+            c = colorForPhase(data.phases[i]);
+          } else {
+            const dist = Math.sqrt(p[0]*p[0] + p[1]*p[1] + p[2]*p[2]) * 0.1;
+            c = colorForDistance(dist, data.max_radius * 0.1);
+          }
           colors[i * 3 + 0] = c.r;
           colors[i * 3 + 1] = c.g;
           colors[i * 3 + 2] = c.b;
@@ -1392,7 +1510,11 @@ const INDEX_HTML: &str = r##"<!doctype html>
           updateBubblesFromPositions(posAttr.array, lastSigns);
         }
         if (modeLabel === "superposition" && animateEnabled && superPsi) {
-          updateSuperpositionColors();
+          if (dotColorMode === "phase") {
+            updateSuperpositionPhaseColors();
+          } else {
+            updateSuperpositionColors();
+          }
         }
         } finally {
           if (wantMorph) {
@@ -1450,7 +1572,11 @@ const INDEX_HTML: &str = r##"<!doctype html>
             }
           }
           if (superPsi) {
-            updateSuperpositionColors();
+            if (dotColorMode === "phase") {
+              updateSuperpositionPhaseColors();
+            } else {
+              updateSuperpositionColors();
+            }
           }
           if (!superFetchInFlight && (now - lastSampleTime) > animDurationMs * 0.9) {
             lastSampleTime = now;
@@ -1521,28 +1647,44 @@ const INFO_HTML: &str = r##"<!doctype html>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; background: #0b0c10; color: #e6e6e6; font-family: "Space Grotesk", "Segoe UI", sans-serif; }
-      .page { max-width: 980px; margin: 0 auto; padding: 24px; }
-      .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-      .title { font-size: 24px; font-weight: 600; }
-      .back { background: #11151b; border: 1px solid #2a2f36; color: #e6e6e6; border-radius: 8px; padding: 6px 10px; font-size: 12px; text-decoration: none; }
-      .back:hover { border-color: #3c6a9e; }
-      h2 { margin-top: 24px; font-size: 16px; letter-spacing: 0.02em; }
-      p, li { color: #c7cdd6; line-height: 1.6; }
-      code, pre { background: #10151c; padding: 10px 12px; border-radius: 6px; display: block; overflow-x: auto; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-      .card { background: #0f1218; border: 1px solid #1f2630; border-radius: 10px; padding: 12px; }
+      html, body { margin: 0; padding: 0; height: 100%; background: radial-gradient(1200px 800px at 20% 10%, #111727 0%, #090b10 55%, #06070b 100%); color: #e7edf5; font-family: "Space Grotesk", "Segoe UI", sans-serif; }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+        background-size: 48px 48px;
+        opacity: 0.15;
+        pointer-events: none;
+      }
+      .page { max-width: 980px; margin: 0 auto; padding: 28px; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+      .title { font-size: 26px; font-weight: 600; letter-spacing: 0.03em; }
+      .back { background: #111722; border: 1px solid #2b3545; color: #e7edf5; border-radius: 10px; padding: 8px 12px; font-size: 12px; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
+      .back:hover { border-color: #4aa3ff; color: #ffffff; }
+      h2 { margin-top: 28px; font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase; color: #b2becc; }
+      p, li { color: #c7cdd6; line-height: 1.65; }
+      code, pre { background: #0f141d; padding: 10px 12px; border-radius: 8px; display: block; overflow-x: auto; border: 1px solid #1e2a3a; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      .card { background: rgba(16, 20, 29, 0.92); border: 1px solid #1f2a3a; border-radius: 12px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+      .hero { background: linear-gradient(135deg, rgba(70,215,198,0.08), rgba(74,163,255,0.08)); border: 1px solid #283244; }
+      .accent-line { height: 2px; width: 54px; background: linear-gradient(90deg, #46d7c6, #f7b059); border-radius: 999px; margin-top: 6px; }
       @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <div class="page">
       <div class="topbar">
-        <div class="title">Quantum Orbitals 3D - Info</div>
+        <div>
+          <div class="title">Quantum Orbitals 3D - Info</div>
+          <div class="accent-line"></div>
+        </div>
         <a class="back" href="/">Back to app</a>
       </div>
 
-      <div class="card">
+      <div class="card hero">
         <p>This page is a full physics and usage reference for the visualizer. It explains the underlying models, how the UI maps to physical quantities, and how the animation is generated.</p>
       </div>
 
@@ -1576,6 +1718,7 @@ const INFO_HTML: &str = r##"<!doctype html>
           <li>l: azimuthal quantum number (s=0, p=1, d=2, f=3, ...)</li>
           <li>m: magnetic quantum number (orientation)</li>
           <li>basis: complex Y_lm or real combinations used in chemistry</li>
+          <li>dot color: radial distance or wavefunction phase</li>
           <li>cnt: number of sample points drawn</li>
           <li>max: maximum radial extent used for sampling</li>
           <li>mix: superposition weight between orbital A and B</li>
@@ -1589,7 +1732,8 @@ const INFO_HTML: &str = r##"<!doctype html>
 
       <h2>What The Colors Mean</h2>
       <div class="card">
-        <p>Color encodes radial distance from the nucleus. The gradient runs from blue near the core through cyan and green to yellow at larger radii.</p>
+        <p>In radial mode, color encodes distance from the nucleus. The gradient runs from blue near the core through cyan and green to yellow at larger radii.</p>
+        <p>In phase mode, color encodes the complex phase angle of psi. This is a visualization aid, not a directly observable quantity in |psi|^2.</p>
       </div>
 
       <h2>Dots vs Bubbles</h2>
@@ -1701,6 +1845,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
     let basis = AngularBasis::from_query(q.basis.as_deref());
     let want_super_psi =
         q.animated.unwrap_or(false) && requested_mode == ViewMode::Superposition;
+    let want_phase = matches!(q.color_mode.as_deref(), Some("phase"));
     let bubble = q.bubble.unwrap_or(false);
     let n2 = q.n2.unwrap_or(n);
     let l2 = q.l2.unwrap_or(l);
@@ -1777,6 +1922,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 psi2: None,
                                 delta_e: None,
                                 signs: if bubble { Some(vec![1; sign_count]) } else { None },
+                                phases: None,
                             };
                             return Json(out).into_response();
                         }
@@ -1882,6 +2028,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 psi2: None,
                                 delta_e: None,
                                 signs: if bubble { Some(vec![1; sign_count]) } else { None },
+                                phases: None,
                             };
                             return Json(out).into_response();
                         }
@@ -1910,6 +2057,19 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                             .unwrap_or_default();
                             let signs = if bubble {
                                 Some(signs_from_radial_samples(
+                                    &samples,
+                                    &radial_r_sign,
+                                    &radial_val_sign,
+                                    l_used,
+                                    m_used,
+                                    RadialKind::R,
+                                    basis,
+                                ))
+                            } else {
+                                None
+                            };
+                            let phases = if want_phase {
+                                Some(phases_from_radial_samples(
                                     &samples,
                                     &radial_r_sign,
                                     &radial_val_sign,
@@ -1950,6 +2110,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 psi2: None,
                                 delta_e: None,
                                 signs,
+                                phases,
                             };
                             return Json(out).into_response();
                         }
@@ -2001,6 +2162,21 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                             } else {
                                 None
                             };
+                            let phases = if want_phase {
+                                Some(phases_from_superposition_lda(
+                                    &samples,
+                                    &orb_a,
+                                    &orb_b,
+                                    m_a,
+                                    m_b,
+                                    mix,
+                                    time,
+                                    delta_e,
+                                    basis,
+                                ))
+                            } else {
+                                None
+                            };
                             let mut mode_note = String::from("OpenMX LDA superposition");
                             if !exact_a || !exact_b {
                                 mode_note.push_str(" (closest orbitals used)");
@@ -2034,6 +2210,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 psi2: if want_super_psi { Some(psi2) } else { None },
                                 delta_e: Some(delta_e),
                                 signs,
+                                phases,
                             };
                             return Json(out).into_response();
                         }
@@ -2094,6 +2271,19 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     } else {
                         None
                     };
+                    let phases = if want_phase {
+                        Some(phases_from_radial_samples(
+                            &samples,
+                            &radial_r_sign,
+                            &radial_val_sign,
+                            l_used,
+                            m_used,
+                            RadialKind::Chi,
+                            basis,
+                        ))
+                    } else {
+                        None
+                    };
                     let used_label = orbital.label.clone();
                     let mode_note = if exact {
                         format!("PSlibrary {}", used_label)
@@ -2123,6 +2313,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                         psi2: None,
                         delta_e: None,
                         signs,
+                        phases,
                     };
                     return Json(out).into_response();
                 }
@@ -2151,6 +2342,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     psi2: None,
                     delta_e: None,
                     signs: None,
+                    phases: None,
                 };
                 return Json(out).into_response();
             } else {
@@ -2183,6 +2375,19 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
             .unwrap_or_default();
             let signs = if bubble {
                 Some(signs_from_superposition_hydrogenic(
+                    &samples,
+                    q1,
+                    q2,
+                    mix,
+                    time,
+                    delta_e,
+                    basis,
+                ))
+            } else {
+                None
+            };
+            let phases = if want_phase {
+                Some(phases_from_superposition_hydrogenic(
                     &samples,
                     q1,
                     q2,
@@ -2234,6 +2439,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                 psi2: if want_super_psi { Some(psi2) } else { None },
                 delta_e: Some(delta_e),
                 signs,
+                phases,
             };
             return Json(out).into_response();
         } else {
@@ -2273,6 +2479,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     psi2: None,
                     delta_e: None,
                     signs: None,
+                    phases: None,
                 };
             return Json(empty).into_response();
         }
@@ -2286,6 +2493,15 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
     .unwrap_or_default();
     let signs = if bubble {
         Some(signs_from_hydrogenic_samples(
+            &raw.iter().map(|(x, y, z)| [*x, *y, *z]).collect::<Vec<_>>(),
+            qn,
+            basis,
+        ))
+    } else {
+        None
+    };
+    let phases = if want_phase {
+        Some(phases_from_hydrogenic_samples(
             &raw.iter().map(|(x, y, z)| [*x, *y, *z]).collect::<Vec<_>>(),
             qn,
             basis,
@@ -2322,6 +2538,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
         psi2: None,
         delta_e: None,
         signs,
+        phases,
     };
     Json(out).into_response()
 }
@@ -2918,6 +3135,14 @@ fn sign_from_value(v: f32) -> i8 {
     }
 }
 
+fn phase_from_components(re: f32, im: f32) -> f32 {
+    if re.abs() + im.abs() < 1e-12 {
+        0.0
+    } else {
+        im.atan2(re)
+    }
+}
+
 fn signs_from_radial_samples(
     samples: &[[f32; 3]],
     radial_r: &[f32],
@@ -2951,6 +3176,40 @@ fn signs_from_radial_samples(
     out
 }
 
+fn phases_from_radial_samples(
+    samples: &[[f32; 3]],
+    radial_r: &[f32],
+    radial_val: &[f32],
+    l: u32,
+    m_l: i32,
+    radial_kind: RadialKind,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let mut radial = interp_radial(r, radial_r, radial_val);
+        if matches!(radial_kind, RadialKind::Chi) && r > 1e-8 {
+            radial /= r;
+        }
+        let (y_re, y_im) = spherical_harmonic_basis(theta, phi, l, m_l, basis);
+        let psi_re = radial * y_re;
+        let psi_im = radial * y_im;
+        out.push(phase_from_components(psi_re, psi_im));
+    }
+    out
+}
+
 fn signs_from_hydrogenic_samples(
     samples: &[[f32; 3]],
     qn: QuantumNumbers,
@@ -2973,6 +3232,33 @@ fn signs_from_hydrogenic_samples(
         let (y_re, _) = spherical_harmonic_basis(theta, phi, qn.l, qn.m_l, basis);
         let psi_re = radial * y_re;
         out.push(sign_from_value(psi_re));
+    }
+    out
+}
+
+fn phases_from_hydrogenic_samples(
+    samples: &[[f32; 3]],
+    qn: QuantumNumbers,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let radial = radial_wavefunction(r, qn.n, qn.l);
+        let (y_re, y_im) = spherical_harmonic_basis(theta, phi, qn.l, qn.m_l, basis);
+        let psi_re = radial * y_re;
+        let psi_im = radial * y_im;
+        out.push(phase_from_components(psi_re, psi_im));
     }
     out
 }
@@ -3014,6 +3300,45 @@ fn signs_from_superposition_hydrogenic(
     out
 }
 
+fn phases_from_superposition_hydrogenic(
+    samples: &[[f32; 3]],
+    q1: QuantumNumbers,
+    q2: QuantumNumbers,
+    mix: f32,
+    time: f32,
+    delta_e: f32,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    let a = mix.sqrt();
+    let b = (1.0 - mix).sqrt();
+    let phase_re = (delta_e * time).cos();
+    let phase_im = -(delta_e * time).sin();
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let r1 = radial_wavefunction(r, q1.n, q1.l);
+        let r2 = radial_wavefunction(r, q2.n, q2.l);
+        let (y1_re, y1_im) = spherical_harmonic_basis(theta, phi, q1.l, q1.m_l, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, q2.l, q2.m_l, basis);
+        let psi1_re = a * r1 * y1_re;
+        let psi1_im = a * r1 * y1_im;
+        let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
+        let psi2_im = b * r2 * (y2_re * phase_im + y2_im * phase_re);
+        out.push(phase_from_components(psi1_re + psi2_re, psi1_im + psi2_im));
+    }
+    out
+}
+
 fn signs_from_superposition_lda(
     samples: &[[f32; 3]],
     orb_a: &LdaOrbital,
@@ -3049,6 +3374,47 @@ fn signs_from_superposition_lda(
         let psi1_re = a * r1 * y1_re;
         let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
         out.push(sign_from_value(psi1_re + psi2_re));
+    }
+    out
+}
+
+fn phases_from_superposition_lda(
+    samples: &[[f32; 3]],
+    orb_a: &LdaOrbital,
+    orb_b: &LdaOrbital,
+    m_a: i32,
+    m_b: i32,
+    mix: f32,
+    time: f32,
+    delta_e: f32,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    let a = mix.sqrt();
+    let b = (1.0 - mix).sqrt();
+    let phase_re = (delta_e * time).cos();
+    let phase_im = -(delta_e * time).sin();
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let r1 = interp_radial(r, &orb_a.radial_r, &orb_a.radial_rfn);
+        let r2 = interp_radial(r, &orb_b.radial_r, &orb_b.radial_rfn);
+        let (y1_re, y1_im) = spherical_harmonic_basis(theta, phi, orb_a.l, m_a, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, orb_b.l, m_b, basis);
+        let psi1_re = a * r1 * y1_re;
+        let psi1_im = a * r1 * y1_im;
+        let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
+        let psi2_im = b * r2 * (y2_re * phase_im + y2_im * phase_re);
+        out.push(phase_from_components(psi1_re + psi2_re, psi1_im + psi2_im));
     }
     out
 }

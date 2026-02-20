@@ -36,6 +36,7 @@ Open `http://127.0.0.1:3000`.
 - `bubble`: request sign data for bubbles mode
 - `valence_style`: spherical or orbitals
 - `basis`: complex or real (chemistry-style)
+- `color_mode`: radial or phase (phase returns per-sample phase angles)
 
 ## Rendering Pipeline
 
@@ -44,6 +45,8 @@ The UI uses Three.js point rendering. Each sample point is scaled and colored ba
 Bubbles mode reconstructs a smooth surface using a Marching Cubes field fed by the sample points. When a phase sign is defined, positive and negative surfaces are shown in red and blue.
 
 For orbital and superposition modes, the basis selector chooses between complex spherical harmonics (phi-symmetric) and real combinations that produce textbook p/d/f lobes.
+
+Dot color mode can switch to phase coloring, which uses arg(psi) for each sample point.
 
 ## Data Sources
 

@@ -10,6 +10,7 @@ Quantum Orbitals 3D is a web-based visualizer for electron probability densities
 - Superposition mode with time evolution
 - Dots or bubbles rendering (smooth surfaces)
 - Real orbital basis option for classic p/d/f lobes
+- Dot color toggle for radial or phase visualization
 - 3D navigation with orbit, zoom, and WASD movement
 - Local web UI at `http://127.0.0.1:3000`
 
