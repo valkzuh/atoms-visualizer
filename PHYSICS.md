@@ -40,7 +40,13 @@ This explains why even s orbitals do not peak at r = 0. Radial nodes are values 
 
 The angular part Y_lm(theta,phi) is a spherical harmonic. It defines lobes and angular nodes. The number of angular nodes is l.
 
-## 5. Superposition And Time Dependence
+## 5. Real Orbital Basis
+
+Complex spherical harmonics include a phase factor exp(i m phi), so |Y_lm|^2 is independent of phi. This produces azimuthally symmetric shapes (rings and shells) for a single m state.
+
+Chemistry textbooks often show real orbitals formed by linear combinations of m and -m. These real combinations have explicit phi dependence and produce the familiar p, d, and f lobes. The visualizer includes a Real basis option that uses these combinations for orbital and superposition views.
+
+## 6. Superposition And Time Dependence
 
 A stationary eigenstate has only a global phase exp(-i E t). The probability density |psi|^2 is time independent, so a single orbital does not animate.
 
@@ -54,19 +60,19 @@ The probability density includes an interference term:
 
 If DeltaE = 0 (degenerate states with the same n), the density is static. The UI may loop the phase for visual continuity, which is not physical time evolution.
 
-## 6. Multi-Electron Densities (LDA)
+## 7. Multi-Electron Densities (LDA)
 
 When available, the visualizer uses OpenMX LDA radial wavefunctions and occupancy for each orbital. Total and valence density views are built by summing occupied orbitals with weights. Single-orbital view uses the selected radial function and Y_lm. LDA data is not m-resolved, so valence lobe mode uses m = 0 as a projection.
 
-## 7. Dots And Bubbles
+## 8. Dots And Bubbles
 
 Dots show Monte Carlo samples. Bubbles reconstruct a smooth surface from those samples. When a phase sign is defined (single orbital and superposition), positive regions are shown in red and negative regions in blue. Density-only modes do not have a sign, so only one surface is shown.
 
-## 8. Sampling Method
+## 9. Sampling Method
 
 Sampling uses rejection sampling in spherical coordinates. Radial samples are drawn from a CDF built from |R_nl|^2 and r^2. Angular samples are accepted according to |Y_lm|^2.
 
-## 9. Fallbacks And Approximations
+## 10. Fallbacks And Approximations
 
 - PSLibrary data is used as a fallback for single-orbital mode.
 - Superposition uses hydrogenic orbitals for any element and scales coordinates by 1/Z.

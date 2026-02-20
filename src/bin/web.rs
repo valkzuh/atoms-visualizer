@@ -17,8 +17,8 @@ mod atomic_data;
 mod atomic_lda;
 
 use physics::{
-    angular_wavefunction, generate_orbital_samples, radial_wavefunction, spherical_harmonic,
-    QuantumNumbers,
+    angular_wavefunction_basis, generate_orbital_samples, generate_orbital_samples_basis,
+    radial_wavefunction, real_spherical_harmonic, spherical_harmonic, AngularBasis, QuantumNumbers,
 };
 use atomic_data::{load_element_data, symbol_for_z, ElementData, Orbital};
 use atomic_lda::{load_lda_element, LdaElement, LdaOrbital};
@@ -40,6 +40,7 @@ struct SampleQuery {
     valence_style: Option<String>,
     animated: Option<bool>,
     bubble: Option<bool>,
+    basis: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -186,6 +187,11 @@ const INDEX_HTML: &str = r##"<!doctype html>
           <option value="bubbles">Bubbles</option>
         </select>
       </div>
+      <div id="bubbleThresholdRow" class="row" style="display: none;">
+        <label>Threshold</label>
+        <input id="bubbleThreshold" type="range" min="0.10" max="0.90" step="0.02" value="0.45" />
+        <span id="bubbleThresholdVal">0.45</span>
+      </div>
 
       <div class="section">
         <div class="section-title">Element</div>
@@ -215,6 +221,13 @@ const INDEX_HTML: &str = r##"<!doctype html>
             <option value="valence">Valence density</option>
             <option value="orbital">Single orbital</option>
             <option value="superposition">Superposition</option>
+          </select>
+        </div>
+        <div id="basisRow" class="row" style="display: none;">
+          <label>Basis</label>
+          <select id="basis">
+            <option value="complex" selected>Complex (m)</option>
+            <option value="real">Real (chemistry)</option>
           </select>
         </div>
         <div id="valenceRow" class="row" style="display: none;">
@@ -306,6 +319,11 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const renderModeSelect = document.getElementById("renderMode");
       const valenceRow = document.getElementById("valenceRow");
       const valenceStyleSelect = document.getElementById("valenceStyle");
+      const basisRow = document.getElementById("basisRow");
+      const basisSelect = document.getElementById("basis");
+      const bubbleThresholdRow = document.getElementById("bubbleThresholdRow");
+      const bubbleThresholdInput = document.getElementById("bubbleThreshold");
+      const bubbleThresholdVal = document.getElementById("bubbleThresholdVal");
       const countInput = document.getElementById("count");
       const maxInput = document.getElementById("max");
       const nInput = document.getElementById("n");
@@ -376,11 +394,11 @@ const INDEX_HTML: &str = r##"<!doctype html>
       let lastExtent = 1.0;
       let lastBubbleUpdate = 0;
       let bubbleDirty = false;
-      const bubbleSampleTarget = 5000;
+      const bubbleSampleTarget = 3500;
       const bubbleResolution = 48;
-      const bubbleKernelRadius = 2;
-      const bubbleKernelSigma = 0.9;
-      const bubbleIsoFraction = 0.3;
+      const bubbleKernelRadius = 1;
+      const bubbleKernelSigma = 0.45;
+      let bubbleIsoFraction = 0.45;
       const bubbleUpdateInterval = 60;
 
       const bubbleKernel = (() => {
@@ -433,6 +451,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
         renderMode = renderModeSelect.value;
         localStorage.setItem("renderMode", renderMode);
         const showBubbles = renderMode === "bubbles";
+        bubbleThresholdRow.style.display = showBubbles ? "flex" : "none";
         if (points) {
           points.visible = !showBubbles;
         }
@@ -532,6 +551,10 @@ const INDEX_HTML: &str = r##"<!doctype html>
         mixVal.textContent = `${a} / ${b}`;
       }
 
+      function updateBubbleThresholdUI() {
+        bubbleThresholdVal.textContent = bubbleIsoFraction.toFixed(2);
+      }
+
       function packPsi(arr) {
         if (!Array.isArray(arr)) return null;
         const out = new Float32Array(arr.length * 2);
@@ -570,6 +593,50 @@ const INDEX_HTML: &str = r##"<!doctype html>
       renderModeSelect.value = renderMode;
       renderModeSelect.addEventListener("change", () => {
         updateRenderMode();
+        fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
+      });
+
+      const storedIso = localStorage.getItem("bubbleIso");
+      if (storedIso) {
+        const parsed = Number(storedIso);
+        if (!Number.isNaN(parsed)) {
+          bubbleIsoFraction = parsed;
+          bubbleThresholdInput.value = parsed.toFixed(2);
+        }
+      }
+      updateBubbleThresholdUI();
+      bubbleThresholdInput.addEventListener("input", () => {
+        bubbleIsoFraction = Number(bubbleThresholdInput.value);
+        localStorage.setItem("bubbleIso", bubbleIsoFraction.toFixed(2));
+        updateBubbleThresholdUI();
+        if (renderMode === "bubbles" && posAttr) {
+          bubbleDirty = true;
+          updateBubblesFromPositions(posAttr.array, lastSigns);
+        }
+      });
+
+      const storedBasis = localStorage.getItem("orbitalBasis");
+      if (storedBasis) {
+        basisSelect.value = storedBasis;
+      }
+      basisSelect.addEventListener("change", () => {
+        localStorage.setItem("orbitalBasis", basisSelect.value);
+        if (basisSelect.value === "real") {
+          const lVal = Number(lInput.value);
+          if (lVal > 0 && Number(mInput.value) === 0) {
+            mInput.value = Math.min(lVal, 3);
+          }
+          const l2Val = Number(l2Input.value);
+          if (l2Val > 0 && Number(m2Input.value) === 0) {
+            m2Input.value = Math.min(l2Val, 3);
+          }
+          if (bubbleIsoFraction < 0.35) {
+            bubbleIsoFraction = 0.45;
+            bubbleThresholdInput.value = bubbleIsoFraction.toFixed(2);
+            localStorage.setItem("bubbleIso", bubbleIsoFraction.toFixed(2));
+            updateBubbleThresholdUI();
+          }
+        }
         fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
       });
 
@@ -633,6 +700,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const orbitalMode = mode === "orbital";
         const superMode = mode === "superposition";
         valenceRow.style.display = mode === "valence" ? "flex" : "none";
+        basisRow.style.display = orbitalMode || superMode ? "flex" : "none";
         nInput.disabled = !(orbitalMode || superMode);
         lInput.disabled = !(orbitalMode || superMode);
         mInput.disabled = !(orbitalMode || superMode);
@@ -661,6 +729,12 @@ const INDEX_HTML: &str = r##"<!doctype html>
         if (nStr && lStr) {
           nInput.value = nStr;
           lInput.value = lStr;
+          if (basisSelect.value === "real") {
+            const lVal = Number(lInput.value);
+            if (lVal > 0 && Number(mInput.value) === 0) {
+              mInput.value = Math.min(lVal, 3);
+            }
+          }
           fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
         }
       });
@@ -709,6 +783,21 @@ const INDEX_HTML: &str = r##"<!doctype html>
         fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
       });
       m2Input.addEventListener("change", () => {
+        fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
+      });
+      nInput.addEventListener("change", () => {
+        fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
+      });
+      lInput.addEventListener("change", () => {
+        if (basisSelect.value === "real") {
+          const lVal = Number(lInput.value);
+          if (lVal > 0 && Number(mInput.value) === 0) {
+            mInput.value = Math.min(lVal, 3);
+          }
+        }
+        fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
+      });
+      mInput.addEventListener("change", () => {
         fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
       });
       mixInput.addEventListener("input", () => {
@@ -1155,7 +1244,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
         try {
           statusEl.textContent = forceTime !== null ? "Animating..." : "Sampling...";
           setActiveElementByZ(z);
-          const params = new URLSearchParams({ n, l, m, n2, l2, m2, z, count: effectiveCount, max, mode, mix, t, valence_style: valenceStyle, animated: wantPsi, bubble: wantBubbles });
+          const params = new URLSearchParams({ n, l, m, n2, l2, m2, z, count: effectiveCount, max, mode, mix, t, valence_style: valenceStyle, animated: wantPsi, bubble: wantBubbles, basis: basisSelect.value });
           const res = await fetch(`/samples?${params.toString()}`);
           if (!res.ok) {
             statusEl.textContent = "Error: " + res.status;
@@ -1178,6 +1267,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
           : (data.source === "pslibrary" ? "PSlibrary" : "Hydrogenic");
         const note = data.note ? ` | ${data.note}` : "";
         const modeLabel = data.mode || mode;
+        const basisLabel = (basisSelect.value === "real" && (modeLabel === "orbital" || modeLabel === "superposition"))
+          ? " | real basis"
+          : "";
         let detail = "total density";
         if (modeLabel === "valence") {
           detail = "valence density";
@@ -1189,7 +1281,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
           const mixValText = data.mix ? data.mix.toFixed(2) : mix.toFixed(2);
           detail = `superposition ${orbA} + ${orbB} (mix ${mixValText})`;
         }
-        statusEl.textContent = `${elementLabel} | ${detail} | count=${data.count} | ${sourceLabel}${note}`;
+        statusEl.textContent = `${elementLabel} | ${detail} | count=${data.count} | ${sourceLabel}${note}${basisLabel}`;
         updateOrbitalList(data.available_orbitals, data.selected_orbital, data.selected_orbital_b);
         if (data.mode === "superposition") {
           if (data.n2 !== null && data.n2 !== undefined) {
@@ -1483,6 +1575,7 @@ const INFO_HTML: &str = r##"<!doctype html>
           <li>n: principal quantum number</li>
           <li>l: azimuthal quantum number (s=0, p=1, d=2, f=3, ...)</li>
           <li>m: magnetic quantum number (orientation)</li>
+          <li>basis: complex Y_lm or real combinations used in chemistry</li>
           <li>cnt: number of sample points drawn</li>
           <li>max: maximum radial extent used for sampling</li>
           <li>mix: superposition weight between orbital A and B</li>
@@ -1503,6 +1596,12 @@ const INFO_HTML: &str = r##"<!doctype html>
       <div class="card">
         <p>Dots mode renders the raw Monte Carlo samples. Bubbles mode builds a smooth isosurface from those samples and renders it as a closed surface.</p>
         <p>When a phase sign is defined (single orbital and superposition), positive regions are shown in red and negative regions in blue. Density-only modes do not have a sign, so only one surface is shown.</p>
+      </div>
+
+      <h2>Real Orbital Basis</h2>
+      <div class="card">
+        <p>The default complex spherical harmonics Y_lm have a phase factor e^{im phi}, so |Y_lm|^2 is independent of phi. This produces azimuthally symmetric shapes (rings or shells).</p>
+        <p>The real basis combines m and -m to form real-valued orbitals with explicit phi dependence. This produces the familiar textbook lobes for p, d, and f orbitals. Select Real (chemistry) in the Basis selector to view those shapes.</p>
       </div>
 
       <h2>Hydrogenic Physics Model</h2>
@@ -1599,6 +1698,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
     let max_radius = q.max.unwrap_or(20.0).max(1.0);
     let requested_mode = ViewMode::from_query(q.mode.as_deref());
     let valence_style = ValenceStyle::from_query(q.valence_style.as_deref());
+    let basis = AngularBasis::from_query(q.basis.as_deref());
     let want_super_psi =
         q.animated.unwrap_or(false) && requested_mode == ViewMode::Superposition;
     let bubble = q.bubble.unwrap_or(false);
@@ -1714,6 +1814,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                         count,
                                         max_r,
                                         RadialKind::R,
+                                        basis,
                                     )
                                 })
                                 .await
@@ -1802,6 +1903,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                     count,
                                     max_r,
                                     RadialKind::R,
+                                    basis,
                                 )
                             })
                             .await
@@ -1814,6 +1916,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                     l_used,
                                     m_used,
                                     RadialKind::R,
+                                    basis,
                                 ))
                             } else {
                                 None
@@ -1878,6 +1981,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                     max_r,
                                     delta_e,
                                     want_super_psi,
+                                    basis,
                                 )
                             })
                             .await
@@ -1892,6 +1996,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                     mix,
                                     time,
                                     delta_e,
+                                    basis,
                                 ))
                             } else {
                                 None
@@ -1971,6 +2076,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                             count,
                             max_r,
                             RadialKind::Chi,
+                            basis,
                         )
                     })
                     .await
@@ -1983,6 +2089,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                             l_used,
                             m_used,
                             RadialKind::Chi,
+                            basis,
                         ))
                     } else {
                         None
@@ -2069,6 +2176,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     max_radius,
                     delta_e,
                     want_super_psi,
+                    basis,
                 )
             })
             .await
@@ -2081,6 +2189,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     mix,
                     time,
                     delta_e,
+                    basis,
                 ))
             } else {
                 None
@@ -2169,13 +2278,17 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
         }
     };
 
-    let raw = tokio::task::spawn_blocking(move || generate_orbital_samples(qn, count, max_radius))
-        .await
-        .unwrap_or_default();
+    let raw = tokio::task::spawn_blocking(move || match basis {
+        AngularBasis::Complex => generate_orbital_samples(qn, count, max_radius),
+        AngularBasis::Real => generate_orbital_samples_basis(qn, count, max_radius, basis),
+    })
+    .await
+    .unwrap_or_default();
     let signs = if bubble {
         Some(signs_from_hydrogenic_samples(
             &raw.iter().map(|(x, y, z)| [*x, *y, *z]).collect::<Vec<_>>(),
             qn,
+            basis,
         ))
     } else {
         None
@@ -2367,6 +2480,7 @@ fn generate_orbital_samples_from_radial(
     num_samples: usize,
     max_radius: f32,
     radial_kind: RadialKind,
+    basis: AngularBasis,
 ) -> Vec<[f32; 3]> {
     use rand::Rng;
     use std::f32::consts::PI;
@@ -2375,7 +2489,7 @@ fn generate_orbital_samples_from_radial(
     let mut rng = rand::thread_rng();
 
     let cdf = build_radial_cdf(radial_r, radial_val, max_radius, radial_kind);
-    let max_ang = max_angular_prob(l, m_l);
+    let max_ang = max_angular_prob(l, m_l, basis);
 
     while samples.len() < num_samples {
         let r = sample_r(&cdf, radial_r, &mut rng);
@@ -2385,7 +2499,7 @@ fn generate_orbital_samples_from_radial(
         loop {
             let cos_theta = rng.gen::<f32>() * 2.0 - 1.0;
             let theta = cos_theta.acos();
-            let ang = angular_wavefunction(theta, phi, l, m_l);
+            let ang = angular_wavefunction_basis(theta, phi, l, m_l, basis);
             if rng.gen::<f32>() < (ang * ang) / max_ang {
                 let x = r * theta.sin() * phi.cos();
                 let y = r * theta.sin() * phi.sin();
@@ -2410,6 +2524,7 @@ fn generate_superposition_samples_lda(
     max_radius: f32,
     delta_e: f32,
     with_psi: bool,
+    basis: AngularBasis,
 ) -> (Vec<[f32; 3]>, Vec<[f32; 2]>, Vec<[f32; 2]>) {
     use rand::Rng;
     use std::f32::consts::PI;
@@ -2430,8 +2545,8 @@ fn generate_superposition_samples_lda(
 
     let cdf_a = build_radial_cdf(&orb_a.radial_r, &orb_a.radial_rfn, max_radius, RadialKind::R);
     let cdf_b = build_radial_cdf(&orb_b.radial_r, &orb_b.radial_rfn, max_radius, RadialKind::R);
-    let max_ang_a = max_angular_prob(orb_a.l, m_a);
-    let max_ang_b = max_angular_prob(orb_b.l, m_b);
+    let max_ang_a = max_angular_prob(orb_a.l, m_a, basis);
+    let max_ang_b = max_angular_prob(orb_b.l, m_b, basis);
     if cdf_a.is_empty() || cdf_b.is_empty() {
         return (samples, psi1, psi2);
     }
@@ -2447,7 +2562,7 @@ fn generate_superposition_samples_lda(
             let theta = loop {
                 let cos_theta = rng.gen::<f32>() * 2.0 - 1.0;
                 let theta = cos_theta.acos();
-                let ang = angular_wavefunction(theta, phi, orb_a.l, m_a);
+                let ang = angular_wavefunction_basis(theta, phi, orb_a.l, m_a, basis);
                 if rng.gen::<f32>() < (ang * ang) / max_ang_a {
                     break theta;
                 }
@@ -2459,7 +2574,7 @@ fn generate_superposition_samples_lda(
             let theta = loop {
                 let cos_theta = rng.gen::<f32>() * 2.0 - 1.0;
                 let theta = cos_theta.acos();
-                let ang = angular_wavefunction(theta, phi, orb_b.l, m_b);
+                let ang = angular_wavefunction_basis(theta, phi, orb_b.l, m_b, basis);
                 if rng.gen::<f32>() < (ang * ang) / max_ang_b {
                     break theta;
                 }
@@ -2470,8 +2585,8 @@ fn generate_superposition_samples_lda(
         let r1 = interp_radial(r, &orb_a.radial_r, &orb_a.radial_rfn);
         let r2 = interp_radial(r, &orb_b.radial_r, &orb_b.radial_rfn);
 
-        let (y1_re, y1_im) = spherical_harmonic(theta, phi, orb_a.l, m_a);
-        let (y2_re, y2_im) = spherical_harmonic(theta, phi, orb_b.l, m_b);
+        let (y1_re, y1_im) = spherical_harmonic_basis(theta, phi, orb_a.l, m_a, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, orb_b.l, m_b, basis);
 
         let psi1_re = a * r1 * y1_re;
         let psi1_im = a * r1 * y1_im;
@@ -2523,6 +2638,7 @@ fn generate_superposition_samples_hydrogenic(
     max_radius: f32,
     delta_e: f32,
     with_psi: bool,
+    basis: AngularBasis,
 ) -> (Vec<[f32; 3]>, Vec<[f32; 2]>, Vec<[f32; 2]>) {
     use rand::Rng;
     use std::f32::consts::PI;
@@ -2552,8 +2668,8 @@ fn generate_superposition_samples_hydrogenic(
         .collect();
     let cdf_a = build_radial_cdf(&rs, &rfn_a, max_radius, RadialKind::R);
     let cdf_b = build_radial_cdf(&rs, &rfn_b, max_radius, RadialKind::R);
-    let max_ang_a = max_angular_prob(qn_a.l, qn_a.m_l);
-    let max_ang_b = max_angular_prob(qn_b.l, qn_b.m_l);
+    let max_ang_a = max_angular_prob(qn_a.l, qn_a.m_l, basis);
+    let max_ang_b = max_angular_prob(qn_b.l, qn_b.m_l, basis);
     if cdf_a.is_empty() || cdf_b.is_empty() {
         return (samples, psi1, psi2);
     }
@@ -2569,7 +2685,7 @@ fn generate_superposition_samples_hydrogenic(
             let theta = loop {
                 let cos_theta = rng.gen::<f32>() * 2.0 - 1.0;
                 let theta = cos_theta.acos();
-                let ang = angular_wavefunction(theta, phi, qn_a.l, qn_a.m_l);
+                let ang = angular_wavefunction_basis(theta, phi, qn_a.l, qn_a.m_l, basis);
                 if rng.gen::<f32>() < (ang * ang) / max_ang_a {
                     break theta;
                 }
@@ -2581,7 +2697,7 @@ fn generate_superposition_samples_hydrogenic(
             let theta = loop {
                 let cos_theta = rng.gen::<f32>() * 2.0 - 1.0;
                 let theta = cos_theta.acos();
-                let ang = angular_wavefunction(theta, phi, qn_b.l, qn_b.m_l);
+                let ang = angular_wavefunction_basis(theta, phi, qn_b.l, qn_b.m_l, basis);
                 if rng.gen::<f32>() < (ang * ang) / max_ang_b {
                     break theta;
                 }
@@ -2591,8 +2707,8 @@ fn generate_superposition_samples_hydrogenic(
 
         let r1 = interp_radial(r, &rs, &rfn_a);
         let r2 = interp_radial(r, &rs, &rfn_b);
-        let (y1_re, y1_im) = spherical_harmonic(theta, phi, qn_a.l, qn_a.m_l);
-        let (y2_re, y2_im) = spherical_harmonic(theta, phi, qn_b.l, qn_b.m_l);
+        let (y1_re, y1_im) = spherical_harmonic_basis(theta, phi, qn_a.l, qn_a.m_l, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, qn_b.l, qn_b.m_l, basis);
 
         let psi1_re = a * r1 * y1_re;
         let psi1_im = a * r1 * y1_im;
@@ -2739,6 +2855,7 @@ fn generate_weighted_orbital_samples(
     num_samples: usize,
     max_radius: f32,
     radial_kind: RadialKind,
+    basis: AngularBasis,
 ) -> Vec<[f32; 3]> {
     let total_weight: f32 = orbitals.iter().map(|orb| orb.weight).sum();
     if total_weight <= 0.0 || orbitals.is_empty() {
@@ -2772,11 +2889,25 @@ fn generate_weighted_orbital_samples(
             count,
             max_radius,
             radial_kind,
+            basis,
         );
         samples.append(&mut part);
     }
 
     samples
+}
+
+fn spherical_harmonic_basis(
+    theta: f32,
+    phi: f32,
+    l: u32,
+    m_l: i32,
+    basis: AngularBasis,
+) -> (f32, f32) {
+    match basis {
+        AngularBasis::Complex => spherical_harmonic(theta, phi, l, m_l),
+        AngularBasis::Real => (real_spherical_harmonic(theta, phi, l, m_l), 0.0),
+    }
 }
 
 fn sign_from_value(v: f32) -> i8 {
@@ -2794,6 +2925,7 @@ fn signs_from_radial_samples(
     l: u32,
     m_l: i32,
     radial_kind: RadialKind,
+    basis: AngularBasis,
 ) -> Vec<i8> {
     let mut out = Vec::with_capacity(samples.len());
     for p in samples {
@@ -2812,14 +2944,18 @@ fn signs_from_radial_samples(
         if matches!(radial_kind, RadialKind::Chi) && r > 1e-8 {
             radial /= r;
         }
-        let (y_re, _) = spherical_harmonic(theta, phi, l, m_l);
+        let (y_re, _) = spherical_harmonic_basis(theta, phi, l, m_l, basis);
         let psi_re = radial * y_re;
         out.push(sign_from_value(psi_re));
     }
     out
 }
 
-fn signs_from_hydrogenic_samples(samples: &[[f32; 3]], qn: QuantumNumbers) -> Vec<i8> {
+fn signs_from_hydrogenic_samples(
+    samples: &[[f32; 3]],
+    qn: QuantumNumbers,
+    basis: AngularBasis,
+) -> Vec<i8> {
     let mut out = Vec::with_capacity(samples.len());
     for p in samples {
         let x = p[0];
@@ -2834,7 +2970,7 @@ fn signs_from_hydrogenic_samples(samples: &[[f32; 3]], qn: QuantumNumbers) -> Ve
         let theta = cos_theta.acos();
         let phi = y.atan2(x);
         let radial = radial_wavefunction(r, qn.n, qn.l);
-        let (y_re, _) = spherical_harmonic(theta, phi, qn.l, qn.m_l);
+        let (y_re, _) = spherical_harmonic_basis(theta, phi, qn.l, qn.m_l, basis);
         let psi_re = radial * y_re;
         out.push(sign_from_value(psi_re));
     }
@@ -2848,6 +2984,7 @@ fn signs_from_superposition_hydrogenic(
     mix: f32,
     time: f32,
     delta_e: f32,
+    basis: AngularBasis,
 ) -> Vec<i8> {
     let mut out = Vec::with_capacity(samples.len());
     let a = mix.sqrt();
@@ -2868,8 +3005,8 @@ fn signs_from_superposition_hydrogenic(
         let phi = y.atan2(x);
         let r1 = radial_wavefunction(r, q1.n, q1.l);
         let r2 = radial_wavefunction(r, q2.n, q2.l);
-        let (y1_re, _) = spherical_harmonic(theta, phi, q1.l, q1.m_l);
-        let (y2_re, y2_im) = spherical_harmonic(theta, phi, q2.l, q2.m_l);
+        let (y1_re, _) = spherical_harmonic_basis(theta, phi, q1.l, q1.m_l, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, q2.l, q2.m_l, basis);
         let psi1_re = a * r1 * y1_re;
         let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
         out.push(sign_from_value(psi1_re + psi2_re));
@@ -2886,6 +3023,7 @@ fn signs_from_superposition_lda(
     mix: f32,
     time: f32,
     delta_e: f32,
+    basis: AngularBasis,
 ) -> Vec<i8> {
     let mut out = Vec::with_capacity(samples.len());
     let a = mix.sqrt();
@@ -2906,8 +3044,8 @@ fn signs_from_superposition_lda(
         let phi = y.atan2(x);
         let r1 = interp_radial(r, &orb_a.radial_r, &orb_a.radial_rfn);
         let r2 = interp_radial(r, &orb_b.radial_r, &orb_b.radial_rfn);
-        let (y1_re, _) = spherical_harmonic(theta, phi, orb_a.l, m_a);
-        let (y2_re, y2_im) = spherical_harmonic(theta, phi, orb_b.l, m_b);
+        let (y1_re, _) = spherical_harmonic_basis(theta, phi, orb_a.l, m_a, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, orb_b.l, m_b, basis);
         let psi1_re = a * r1 * y1_re;
         let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
         out.push(sign_from_value(psi1_re + psi2_re));
@@ -2968,12 +3106,12 @@ fn sample_r<R: rand::Rng>(cdf: &[f32], rs: &[f32], rng: &mut R) -> f32 {
     r0 + (r1 - r0) * t
 }
 
-fn max_angular_prob(l: u32, m_l: i32) -> f32 {
+fn max_angular_prob(l: u32, m_l: i32, basis: AngularBasis) -> f32 {
     use std::f32::consts::PI;
     let mut max_val = 0.0_f32;
     for i in 0..720 {
         let theta = (i as f32 + 0.5) / 720.0 * PI;
-        let ang = angular_wavefunction(theta, 0.0, l, m_l);
+        let ang = angular_wavefunction_basis(theta, 0.0, l, m_l, basis);
         let p = ang * ang;
         if p > max_val {
             max_val = p;

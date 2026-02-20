@@ -35,12 +35,15 @@ Open `http://127.0.0.1:3000`.
 - `animated`: hint to return animation-friendly data
 - `bubble`: request sign data for bubbles mode
 - `valence_style`: spherical or orbitals
+- `basis`: complex or real (chemistry-style)
 
 ## Rendering Pipeline
 
 The UI uses Three.js point rendering. Each sample point is scaled and colored based on radial distance. Superposition animation morphs between successive sample clouds.
 
 Bubbles mode reconstructs a smooth surface using a Marching Cubes field fed by the sample points. When a phase sign is defined, positive and negative surfaces are shown in red and blue.
+
+For orbital and superposition modes, the basis selector chooses between complex spherical harmonics (phi-symmetric) and real combinations that produce textbook p/d/f lobes.
 
 ## Data Sources
 

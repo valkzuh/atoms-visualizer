@@ -18,3 +18,10 @@ Cargo.lock
 
 # Debug files
 *.dSYM/
+
+# App data / downloads
+/data/
+tmp_*.alog
+tmp_*.UPF
+*.log
+*.err

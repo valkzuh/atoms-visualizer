@@ -26,6 +26,13 @@ Use the Render switch at the top to select:
 - Dots: Monte Carlo samples
 - Bubbles: smooth isosurfaces, red/blue for phase sign when defined
 
+## Orbital Basis
+
+For Single orbital and Superposition modes, the Basis selector lets you choose:
+
+- Complex (m): standard complex spherical harmonics (phi-symmetric)
+- Real (chemistry): real combinations that show classic p/d/f lobes
+
 ## Notes
 
 If superposition looks static, make sure the two states have different n values. States with the same n are degenerate and do not evolve in time in the hydrogenic model.
