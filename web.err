@@ -1,0 +1,25 @@
+   Compiling atoms v0.1.0 (C:\Users\meper\Downloads\atoms)
+warning: field `symbol` is never read
+  --> src\bin\..\atomic_data.rs:22:9
+   |
+21 | pub struct ElementData {
+   |            ----------- field in this struct
+22 |     pub symbol: String,
+   |         ^^^^^^
+   |
+   = note: `ElementData` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `symbol` is never read
+  --> src\bin\..\atomic_lda.rs:20:9
+   |
+19 | pub struct LdaElement {
+   |            ---------- field in this struct
+20 |     pub symbol: String,
+   |         ^^^^^^
+   |
+   = note: `LdaElement` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: `atoms` (bin "web") generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.58s
+     Running `target\debug\web.exe`
