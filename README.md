@@ -8,7 +8,7 @@ A 3D orbital visualizer served as a local web app. It renders electron probabili
 cargo run --bin web
 ```
 
-Open `http://127.0.0.1:3000` in your browser.
+Open `http://127.0.0.1:3000` in your browser. The server binds to `0.0.0.0` by default and respects the `PORT` environment variable for hosted deployments.
 
 For full documentation, open `http://127.0.0.1:3000/info`.
 

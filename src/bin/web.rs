@@ -4448,8 +4448,12 @@ async fn main() {
         .route("/samples", get(samples))
         .route("/static/three.module.js", get(three_module))
         .route("/static/MarchingCubes.js", get(marching_cubes));
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("Serving on http://127.0.0.1:3000");
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3000);
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    println!("Serving on http://0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
