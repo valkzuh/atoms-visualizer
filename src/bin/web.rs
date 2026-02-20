@@ -69,6 +69,7 @@ struct SampleResponse {
     delta_e: Option<f32>,
     signs: Option<Vec<i8>>,
     phases: Option<Vec<f32>>,
+    intensities: Option<Vec<f32>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -149,38 +150,70 @@ const INDEX_HTML: &str = r##"<!doctype html>
         --accent-2: #f7b059;
         --accent-3: #4aa3ff;
       }
-      html, body { margin: 0; padding: 0; height: 100%; background: radial-gradient(1200px 800px at 20% 10%, #111727 0%, var(--bg) 55%, #090b10 100%); color: var(--text); font-family: "Space Grotesk", "Segoe UI", sans-serif; }
+      html, body { margin: 0; padding: 0; height: 100%; background: #0b1016; color: var(--text); font-family: "Space Grotesk", "Segoe UI", sans-serif; }
       body::before {
         content: "";
         position: fixed;
         inset: 0;
         background-image:
-          linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
-        background-size: 48px 48px;
-        opacity: 0.15;
+          radial-gradient(circle at 20% 20%, rgba(70,215,198,0.12), transparent 35%),
+          radial-gradient(circle at 80% 30%, rgba(74,163,255,0.14), transparent 35%),
+          radial-gradient(circle at 30% 80%, rgba(247,176,89,0.08), transparent 40%),
+          radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
+          radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+        background-size: 100% 100%, 100% 100%, 100% 100%, 120px 120px, 240px 240px;
+        opacity: 0.35;
         pointer-events: none;
       }
       canvas { display: block; }
-      #panel { position: absolute; top: 16px; left: 16px; width: 360px; background: var(--panel); padding: 14px; border: 1px solid var(--panel-border); border-radius: 14px; box-shadow: 0 18px 48px rgba(0,0,0,0.45); backdrop-filter: blur(6px); }
+      #panel { position: fixed; top: 24px; left: 24px; width: 420px; height: calc(100vh - 48px); background: var(--panel); padding: 18px; border: 1px solid var(--panel-border); border-radius: 18px; box-shadow: 0 22px 60px rgba(0,0,0,0.55); backdrop-filter: blur(8px); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s ease, opacity 0.2s ease; }
+      #panel.collapsed { transform: translateX(-120%); opacity: 0; pointer-events: none; }
+      #panel.collapsed #panelInner { display: none; }
+      #panel.collapsed .panel-meta { display: none; }
+      #panel.collapsed .brand { font-size: 14px; }
+      #panelInner { flex: 1; overflow: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: rgba(88, 197, 204, 0.7) rgba(10, 14, 22, 0.4); }
+      #panelInner::-webkit-scrollbar { width: 10px; }
+      #panelInner::-webkit-scrollbar-track { background: rgba(10, 14, 22, 0.4); border-radius: 999px; }
+      #panelInner::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(88, 197, 204, 0.85), rgba(59, 130, 246, 0.85)); border-radius: 999px; border: 2px solid rgba(10, 14, 22, 0.5); }
+      #panelInner::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(104, 224, 232, 0.95), rgba(99, 179, 255, 0.95)); }
       #infoButton { position: absolute; top: 16px; right: 16px; background: #111722; border: 1px solid #2b3545; color: var(--text); border-radius: 10px; padding: 8px 12px; font-size: 12px; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
       #infoButton:hover { border-color: var(--accent-3); color: #ffffff; }
+      .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+      .panel-meta { font-size: 10px; text-transform: uppercase; letter-spacing: 0.28em; color: var(--muted-2); }
       .brand { font-size: 17px; font-weight: 600; letter-spacing: 0.04em; display: flex; align-items: center; gap: 8px; }
+      #menuToggle { background: #0f1623; border: 1px solid #2a364a; color: var(--text); border-radius: 10px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+      #menuToggle:hover { border-color: var(--accent-3); color: #ffffff; }
+      #panelDock { position: fixed; top: 24px; left: 24px; display: none; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 10px 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.5); backdrop-filter: blur(8px); }
+      #panelDock .brand { font-size: 14px; white-space: nowrap; }
+      #panelDock.show { display: flex; }
       .brand::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(120deg, var(--accent), var(--accent-2)); display: inline-block; box-shadow: 0 0 12px rgba(70,215,198,0.6); }
-      .section { margin-top: 14px; padding-top: 12px; border-top: 1px solid #1a2230; }
-      .section:first-of-type { margin-top: 10px; padding-top: 0; border-top: none; }
+      .section { margin-top: 12px; padding: 12px; border: 1px solid #1b2431; border-radius: 14px; background: rgba(10, 14, 22, 0.7); }
+      .section:first-of-type { margin-top: 8px; }
       .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted-2); margin-bottom: 6px; }
-      .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-      .row label { font-size: 11px; color: var(--muted); min-width: 40px; }
-      input, select { background: #0e141f; color: var(--text); border: 1px solid #263042; border-radius: 8px; padding: 6px 8px; font-size: 12px; }
-      input[type="number"] { width: 62px; }
-      select { flex: 1; min-width: 140px; }
+      .section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; background: transparent; border: none; color: var(--text); padding: 6px 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.22em; cursor: pointer; }
+      .section-toggle::after { content: "+"; color: var(--muted-2); }
+      .section-toggle.open::after { content: "-"; }
+      .section-body { display: none; margin-top: 8px; }
+      .section-body.open { display: block; }
+      .row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+      .row label { font-size: 11px; color: var(--muted); min-width: 42px; }
+      #quantumRow { display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr; align-items: center; gap: 8px; }
+      #quantumRow label { min-width: 0; }
+      #quantumRow input { width: 64px; }
+      @media (max-width: 520px) {
+        #quantumRow { grid-template-columns: repeat(2, auto 1fr); }
+      }
+      input, select { background: #0e141f; color: var(--text); border: 1px solid #263042; border-radius: 9px; padding: 7px 9px; font-size: 12px; }
+      input[type="number"] { width: 70px; }
+      select { flex: 1; min-width: 160px; }
       input[type="range"] { accent-color: var(--accent); }
-      button { background: #111a28; color: var(--text); border: 1px solid #2a364a; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; }
+      button { background: #111a28; color: var(--text); border: 1px solid #2a364a; border-radius: 9px; padding: 8px 12px; font-size: 12px; cursor: pointer; }
       button.primary { background: linear-gradient(120deg, #1c2c3d, #1f3b52); border-color: #3f6f9d; }
+      button.ghost { background: transparent; border-color: #2a364a; color: var(--muted); }
+      button.ghost:hover { border-color: var(--accent-3); color: var(--text); }
       button:disabled { opacity: 0.6; cursor: default; }
       #controls { margin-top: 6px; font-size: 12px; color: var(--muted); }
-      #status { margin-top: 10px; font-size: 12px; color: #b7c3d3; }
+      #status { margin-top: 12px; font-size: 12px; color: #b7c3d3; }
       .hint { font-size: 11px; color: var(--muted-2); margin-top: 6px; }
       #animControls { margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: #c9d1d9; }
       #animControls input[type="range"] { width: 140px; }
@@ -192,135 +225,190 @@ const INDEX_HTML: &str = r##"<!doctype html>
       .dropdown-btn { width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
       .dropdown-panel { position: absolute; left: 0; right: 0; top: 100%; margin-top: 8px; background: #0f141f; border: 1px solid #263042; border-radius: 12px; padding: 10px; max-height: 380px; overflow: auto; display: none; z-index: 5; box-shadow: 0 14px 30px rgba(0,0,0,0.4); }
       .dropdown-panel.open { display: block; }
-      #elementSearch { width: 100%; margin-bottom: 8px; }
-      #periodicGrid { display: grid; grid-template-columns: repeat(18, minmax(0, 1fr)); gap: 4px; }
+      #elementSearch { width: 100%; margin-bottom: 12px; }
+      #periodicGrid { display: grid; grid-template-columns: repeat(18, minmax(0, 1fr)); gap: 8px; width: 100%; min-width: 0; }
       .series-label { font-size: 11px; color: var(--muted-2); margin-top: 10px; margin-bottom: 6px; }
-      .series-grid { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 4px; }
-      .periodic-cell { height: 30px; display: flex; align-items: center; justify-content: center; font-size: 11px; border-radius: 8px; }
+      .series-grid { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 6px; width: 100%; min-width: 0; }
+      .periodic-cell { height: 38px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 9px; }
       .el-btn { background: #121a27; border: 1px solid #2a364a; color: var(--text); cursor: pointer; }
       .el-btn:hover { border-color: var(--accent-3); }
       .el-btn.active { background: #1c2b3d; border-color: var(--accent-3); color: #d8ebff; }
       .el-empty { border: 1px dashed #233043; color: #3a4450; }
+      .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; }
+      .modal.open { display: flex; }
+      .modal::before { content: ""; position: absolute; inset: 0; background: rgba(4,8,12,0.7); backdrop-filter: blur(6px); }
+      .modal-card { position: relative; width: min(1100px, 94vw); max-height: 86vh; overflow-y: auto; overflow-x: hidden; background: #0f141f; border: 1px solid #263042; border-radius: 16px; padding: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); box-sizing: border-box; }
+      .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .modal-title { font-size: 16px; letter-spacing: 0.12em; text-transform: uppercase; }
+      .modal-sub { font-size: 12px; color: var(--muted-2); margin-top: 2px; }
+      .modal-grid { display: grid; gap: 10px; width: 100%; box-sizing: border-box; }
     </style>
   </head>
   <body>
     <a id="infoButton" href="/info">Info</a>
-    <div id="panel">
+    <div id="panelDock">
       <div class="brand">Quantum Orbitals</div>
-      <div class="row" style="margin-top: 8px;">
-        <label>Render</label>
-        <select id="renderMode">
-          <option value="dots" selected>Dots</option>
-          <option value="bubbles">Bubbles</option>
-        </select>
+      <button id="menuShow" class="ghost">Show</button>
+    </div>
+    <div id="panel">
+      <div class="panel-header">
+        <div class="brand">Quantum Orbitals</div>
+        <button id="menuToggle" title="Toggle menu">Hide</button>
+        <div class="panel-meta">Menu</div>
       </div>
-      <div id="dotColorRow" class="row">
-        <label>Dot color</label>
-        <select id="dotColorMode">
-          <option value="radial" selected>Radial</option>
-          <option value="phase">Phase</option>
-        </select>
-      </div>
-      <div id="bubbleThresholdRow" class="row" style="display: none;">
-        <label>Threshold</label>
-        <input id="bubbleThreshold" type="range" min="0.10" max="0.90" step="0.02" value="0.45" />
-        <span id="bubbleThresholdVal">0.45</span>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Element</div>
-        <div class="dropdown">
-          <button id="elementButton" class="dropdown-btn">H Hydrogen (Z=1)</button>
-          <div id="elementDropdown" class="dropdown-panel">
-            <input id="elementSearch" type="text" placeholder="Filter by symbol or name" />
-            <div id="periodicGrid"></div>
-            <div class="series-label">Lanthanides</div>
-            <div id="lanthRow" class="series-grid"></div>
-            <div class="series-label">Actinides</div>
-            <div id="actRow" class="series-grid"></div>
+      <div id="panelInner">
+        <div class="section" data-section="render">
+          <button class="section-toggle open" data-target="renderBody">Render</button>
+          <div id="renderBody" class="section-body open">
+            <div class="row">
+              <label>Render</label>
+              <select id="renderMode">
+                <option value="dots" selected>Dots</option>
+                <option value="bubbles">Bubbles</option>
+              </select>
+            </div>
+            <div id="dotColorRow" class="row">
+              <label>Dot color</label>
+              <select id="dotColorMode">
+                <option value="radial" selected>Radial</option>
+                <option value="phase">Phase</option>
+                <option value="intensity">Intensity</option>
+              </select>
+            </div>
+            <div id="dotSizeRow" class="row">
+              <label>Dot size</label>
+              <input id="dotSize" type="range" min="0.0005" max="0.1" step="0.0005" value="0.002" />
+              <span id="dotSizeVal">0.002</span>
+            </div>
+            <div id="bubbleThresholdRow" class="row" style="display: none;">
+              <label>Threshold</label>
+              <input id="bubbleThreshold" type="range" min="0.10" max="0.90" step="0.02" value="0.45" />
+              <span id="bubbleThresholdVal">0.45</span>
+            </div>
+            <div id="bubbleQualityRow" class="row" style="display: none;">
+              <label>Quality</label>
+              <input id="bubbleQuality" type="range" min="1" max="4" step="1" value="2" />
+              <span id="bubbleQualityVal">Medium (48^3)</span>
+            </div>
           </div>
         </div>
-        <div class="row">
-          <label>Z</label><input id="z" type="number" min="1" max="118" value="1" />
-          <button id="go" class="primary">Generate</button>
+
+        <div class="section" data-section="element">
+          <button class="section-toggle open" data-target="elementBody">Element</button>
+          <div id="elementBody" class="section-body open">
+            <div class="row">
+              <button id="elementButton" class="dropdown-btn primary">H Hydrogen (Z=1)</button>
+            </div>
+            <div class="row">
+              <label>Z</label><input id="z" type="number" min="1" max="118" value="1" />
+              <button id="go" class="primary">Generate</button>
+            </div>
+            <div class="hint">Click the element name to open the periodic table.</div>
+          </div>
+        </div>
+
+        <div class="section" data-section="view">
+          <button class="section-toggle open" data-target="viewBody">View</button>
+          <div id="viewBody" class="section-body open">
+            <div class="row">
+              <label>Mode</label>
+              <select id="mode">
+                <option value="total" selected>Total density</option>
+                <option value="valence">Valence density</option>
+                <option value="orbital">Single orbital</option>
+                <option value="superposition">Superposition</option>
+              </select>
+            </div>
+            <div id="basisRow" class="row" style="display: none;">
+              <label>Basis</label>
+              <select id="basis">
+                <option value="real" selected>Real (chemistry)</option>
+                <option value="complex">Complex (m)</option>
+              </select>
+            </div>
+            <div id="valenceRow" class="row" style="display: none;">
+              <label>Valence</label>
+              <select id="valenceStyle">
+                <option value="spherical" selected>Spherical density</option>
+                <option value="orbitals">Orbital lobes (m=0)</option>
+              </select>
+            </div>
+            <div id="orbitalRow" class="row">
+              <label>Orb</label>
+              <select id="orbitalSelect"></select>
+            </div>
+            <div id="superRow" class="row">
+              <label>Orb B</label>
+              <select id="orbitalSelectB"></select>
+              <label>n2</label><input id="n2" type="number" min="1" value="2" />
+              <label>l2</label><input id="l2" type="number" min="0" value="1" />
+              <label>m2</label><input id="m2" type="number" value="0" />
+            </div>
+            <div id="superPickRow" class="row" style="display: none;">
+              <button id="pickPair">Pick animating pair</button>
+            </div>
+            <div class="row" id="quantumRow">
+              <label>n</label><input id="n" type="number" min="1" value="2" />
+              <label>l</label><input id="l" type="number" min="0" value="1" />
+              <label>m</label><input id="m" type="number" value="0" />
+            </div>
+            <div id="mixRow" class="row">
+              <label>mix</label>
+              <input id="mix" type="range" min="0.05" max="0.95" step="0.01" value="0.50" />
+              <span id="mixVal">0.50 / 0.50</span>
+            </div>
+            <div class="hint">Occupied orbitals shown for LDA. For H, type any n/l/m.</div>
+          </div>
+        </div>
+
+        <div class="section" data-section="sampling">
+          <button class="section-toggle" data-target="samplingBody">Sampling</button>
+          <div id="samplingBody" class="section-body">
+            <div class="row">
+              <label>cnt</label><input id="count" type="number" min="1000" step="1000" value="50000" />
+              <label>max</label><input id="max" type="number" min="1" step="1" value="20" />
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="controls">
+          <button class="section-toggle open" data-target="controlsBody">Controls</button>
+          <div id="controlsBody" class="section-body open">
+            <div id="controls">Drag to orbit - Scroll to zoom - WASD to move (bounded)</div>
+            <div class="row">
+              <button id="resetCamera">Reset camera</button>
+            </div>
+            <div id="animControls">
+              <label><input id="animated" type="checkbox" /> Animated (time evolution)</label>
+              <label>Speed</label>
+              <input id="animSpeed" type="range" min="0" max="3" step="0.05" value="1" />
+              <span id="animSpeedVal">1.00x</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="status">Ready.</div>
+      </div>
+    </div>
+
+    <div id="elementModal" class="modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">Periodic Table</div>
+            <div class="modal-sub">Choose an element preset</div>
+          </div>
+          <button id="closeTable" class="ghost">Close</button>
+        </div>
+        <input id="elementSearch" type="text" placeholder="Filter by symbol or name" />
+        <div class="modal-grid">
+          <div id="periodicGrid"></div>
+          <div class="series-label">Lanthanides</div>
+          <div id="lanthRow" class="series-grid"></div>
+          <div class="series-label">Actinides</div>
+          <div id="actRow" class="series-grid"></div>
         </div>
       </div>
-
-      <div class="section">
-        <div class="section-title">View</div>
-        <div class="row">
-          <label>Mode</label>
-          <select id="mode">
-            <option value="total" selected>Total density</option>
-            <option value="valence">Valence density</option>
-            <option value="orbital">Single orbital</option>
-            <option value="superposition">Superposition</option>
-          </select>
-        </div>
-        <div id="basisRow" class="row" style="display: none;">
-          <label>Basis</label>
-          <select id="basis">
-            <option value="complex" selected>Complex (m)</option>
-            <option value="real">Real (chemistry)</option>
-          </select>
-        </div>
-        <div id="valenceRow" class="row" style="display: none;">
-          <label>Valence</label>
-          <select id="valenceStyle">
-            <option value="spherical" selected>Spherical density</option>
-            <option value="orbitals">Orbital lobes (m=0)</option>
-          </select>
-        </div>
-        <div id="orbitalRow" class="row">
-          <label>Orb</label>
-          <select id="orbitalSelect"></select>
-        </div>
-        <div id="superRow" class="row">
-          <label>Orb B</label>
-          <select id="orbitalSelectB"></select>
-          <label>n2</label><input id="n2" type="number" min="1" value="2" />
-          <label>l2</label><input id="l2" type="number" min="0" value="1" />
-          <label>m2</label><input id="m2" type="number" value="0" />
-        </div>
-        <div id="superPickRow" class="row" style="display: none;">
-          <button id="pickPair">Pick animating pair</button>
-        </div>
-        <div class="row" id="quantumRow">
-          <label>n</label><input id="n" type="number" min="1" value="2" />
-          <label>l</label><input id="l" type="number" min="0" value="1" />
-          <label>m</label><input id="m" type="number" value="0" />
-        </div>
-        <div id="mixRow" class="row">
-          <label>mix</label>
-          <input id="mix" type="range" min="0.05" max="0.95" step="0.01" value="0.50" />
-          <span id="mixVal">0.50 / 0.50</span>
-        </div>
-        <div class="hint">Occupied orbitals shown for LDA. For H, type any n/l/m.</div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Sampling</div>
-        <div class="row">
-          <label>cnt</label><input id="count" type="number" min="1000" step="1000" value="50000" />
-          <label>max</label><input id="max" type="number" min="1" step="1" value="20" />
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Controls</div>
-        <div id="controls">Drag to orbit - Scroll to zoom - WASD to move (bounded)</div>
-        <div class="row">
-          <button id="resetCamera">Reset camera</button>
-        </div>
-        <div id="animControls">
-          <label><input id="animated" type="checkbox" /> Animated (time evolution)</label>
-          <label>Speed</label>
-          <input id="animSpeed" type="range" min="0" max="3" step="0.05" value="1" />
-          <span id="animSpeedVal">1.00x</span>
-        </div>
-      </div>
-
-      <div id="status">Ready.</div>
     </div>
     <script type="importmap">
       {
@@ -334,8 +422,14 @@ const INDEX_HTML: &str = r##"<!doctype html>
       import { MarchingCubes } from "/static/MarchingCubes.js";
 
       const statusEl = document.getElementById("status");
+      const panel = document.getElementById("panel");
+      const panelInner = document.getElementById("panelInner");
+      const menuToggle = document.getElementById("menuToggle");
+      const panelDock = document.getElementById("panelDock");
+      const menuShow = document.getElementById("menuShow");
       const elementButton = document.getElementById("elementButton");
-      const elementDropdown = document.getElementById("elementDropdown");
+      const elementModal = document.getElementById("elementModal");
+      const closeTableButton = document.getElementById("closeTable");
       const elementSearch = document.getElementById("elementSearch");
       const periodicGrid = document.getElementById("periodicGrid");
       const lanthRow = document.getElementById("lanthRow");
@@ -353,6 +447,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const renderModeSelect = document.getElementById("renderMode");
       const dotColorSelect = document.getElementById("dotColorMode");
       const dotColorRow = document.getElementById("dotColorRow");
+      const dotSizeRow = document.getElementById("dotSizeRow");
+      const dotSizeInput = document.getElementById("dotSize");
+      const dotSizeVal = document.getElementById("dotSizeVal");
       const valenceRow = document.getElementById("valenceRow");
       const valenceStyleSelect = document.getElementById("valenceStyle");
       const basisRow = document.getElementById("basisRow");
@@ -360,6 +457,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const bubbleThresholdRow = document.getElementById("bubbleThresholdRow");
       const bubbleThresholdInput = document.getElementById("bubbleThreshold");
       const bubbleThresholdVal = document.getElementById("bubbleThresholdVal");
+      const bubbleQualityRow = document.getElementById("bubbleQualityRow");
+      const bubbleQualityInput = document.getElementById("bubbleQuality");
+      const bubbleQualityVal = document.getElementById("bubbleQualityVal");
       const countInput = document.getElementById("count");
       const maxInput = document.getElementById("max");
       const nInput = document.getElementById("n");
@@ -372,7 +472,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const resetCameraButton = document.getElementById("resetCamera");
       const animControls = document.getElementById("animControls");
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0b0c10);
+      scene.background = new THREE.Color(0x0b1016);
 
       const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
       camera.position.set(0, 0, 8);
@@ -430,15 +530,22 @@ const INDEX_HTML: &str = r##"<!doctype html>
       let lastExtent = 1.0;
       let lastBubbleUpdate = 0;
       let bubbleDirty = false;
-      const bubbleSampleTarget = 3500;
-      const bubbleResolution = 48;
+      let bubbleSampleTarget = 3500;
+      let bubbleResolution = 48;
       const bubbleKernelRadius = 1;
-      const bubbleKernelSigma = 0.45;
+      let bubbleKernelSigma = 0.45;
       let bubbleIsoFraction = 0.45;
-      const bubbleUpdateInterval = 60;
+      let bubbleUpdateInterval = 60;
+      let bubbleQuality = 2;
       let dotColorMode = "radial";
+      let dotSize = 0.002;
+      let spinTime = 0;
+      let spinPhi0 = null;
+      let spinRho = null;
+      let spinOmega = null;
+      let spinZ = null;
 
-      const bubbleKernel = (() => {
+      function buildBubbleKernel() {
         const entries = [];
         const sigma2 = bubbleKernelSigma * bubbleKernelSigma;
         for (let dz = -bubbleKernelRadius; dz <= bubbleKernelRadius; dz++) {
@@ -453,7 +560,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
           }
         }
         return entries;
-      })();
+      }
+
+      let bubbleKernel = buildBubbleKernel();
 
       function updateAnimUI() {
         animSpeedVal.textContent = animSpeed.toFixed(2) + "x";
@@ -484,12 +593,56 @@ const INDEX_HTML: &str = r##"<!doctype html>
         }
       }
 
+      const bubbleQualityPresets = [
+        { label: "Low", resolution: 36, samples: 3000, sigma: 0.5, interval: 80 },
+        { label: "Medium", resolution: 48, samples: 5000, sigma: 0.45, interval: 60 },
+        { label: "High", resolution: 64, samples: 12000, sigma: 0.45, interval: 70 },
+        { label: "Ultra", resolution: 80, samples: 20000, sigma: 0.42, interval: 90 }
+      ];
+
+      function applyBubbleQuality(level, persist = true) {
+        const index = Math.min(Math.max(level, 1), bubbleQualityPresets.length) - 1;
+        const preset = bubbleQualityPresets[index];
+        bubbleQuality = index + 1;
+        bubbleResolution = preset.resolution;
+        bubbleSampleTarget = preset.samples;
+        bubbleKernelSigma = preset.sigma;
+        bubbleUpdateInterval = preset.interval;
+        bubbleKernel = buildBubbleKernel();
+        bubbleQualityVal.textContent = `${preset.label} (${preset.resolution}^3)`;
+        bubbleQualityInput.value = String(bubbleQuality);
+        if (persist) {
+          localStorage.setItem("bubbleQuality", String(bubbleQuality));
+        }
+        if (bubbleQuality >= 3 && bubbleIsoFraction > 0.8) {
+          bubbleIsoFraction = 0.65;
+          bubbleThresholdInput.value = bubbleIsoFraction.toFixed(2);
+          updateBubbleThresholdUI();
+          localStorage.setItem("bubbleIso", bubbleIsoFraction.toFixed(2));
+          statusEl.textContent = "Threshold lowered for high quality to keep bubbles visible.";
+        }
+        if (bubbleGroup) {
+          scene.remove(bubbleGroup);
+          bubbleGroup = null;
+          bubblePos = null;
+          bubbleNeg = null;
+        }
+        if (renderMode === "bubbles") {
+          initBubbles();
+          if (posAttr) {
+            updateBubblesFromPositions(posAttr.array, lastSigns);
+          }
+        }
+      }
+
       function updateRenderMode() {
         renderMode = renderModeSelect.value;
         localStorage.setItem("renderMode", renderMode);
         const showBubbles = renderMode === "bubbles";
         bubbleThresholdRow.style.display = showBubbles ? "flex" : "none";
+        bubbleQualityRow.style.display = showBubbles ? "flex" : "none";
         dotColorRow.style.display = showBubbles ? "none" : "flex";
+        dotSizeRow.style.display = showBubbles ? "none" : "flex";
         dotColorSelect.disabled = showBubbles;
         updateModeUI();
         if (points) {
@@ -644,6 +797,40 @@ const INDEX_HTML: &str = r##"<!doctype html>
         fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
       });
 
+      const storedDotSize = localStorage.getItem("dotSize");
+      if (storedDotSize) {
+        const parsed = Number(storedDotSize);
+        if (!Number.isNaN(parsed)) {
+          dotSize = parsed;
+        }
+      }
+      function updateDotSizeUI() {
+        dotSizeVal.textContent = dotSize.toFixed(4);
+        dotSizeInput.value = dotSize.toFixed(4);
+      }
+      updateDotSizeUI();
+      dotSizeInput.addEventListener("input", () => {
+        dotSize = Number(dotSizeInput.value);
+        updateDotSizeUI();
+        localStorage.setItem("dotSize", dotSize.toFixed(4));
+        if (points && points.material) {
+          points.material.size = dotSize;
+          points.material.needsUpdate = true;
+        }
+      });
+
+      const storedQuality = localStorage.getItem("bubbleQuality");
+      if (storedQuality) {
+        const parsedQuality = parseInt(storedQuality, 10);
+        if (!Number.isNaN(parsedQuality)) {
+          bubbleQuality = parsedQuality;
+        }
+      }
+      applyBubbleQuality(bubbleQuality, false);
+      bubbleQualityInput.addEventListener("input", () => {
+        applyBubbleQuality(parseInt(bubbleQualityInput.value, 10));
+      });
+
       const storedIso = localStorage.getItem("bubbleIso");
       if (storedIso) {
         const parsed = Number(storedIso);
@@ -666,6 +853,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const storedBasis = localStorage.getItem("orbitalBasis");
       if (storedBasis) {
         basisSelect.value = storedBasis;
+      } else {
+        basisSelect.value = "real";
+        localStorage.setItem("orbitalBasis", "real");
       }
       basisSelect.addEventListener("change", () => {
         localStorage.setItem("orbitalBasis", basisSelect.value);
@@ -678,7 +868,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
           if (l2Val > 0 && Number(m2Input.value) === 0) {
             m2Input.value = Math.min(l2Val, 3);
           }
-          if (bubbleIsoFraction < 0.35) {
+          if (renderMode === "bubbles" && bubbleIsoFraction < 0.35) {
             bubbleIsoFraction = 0.45;
             bubbleThresholdInput.value = bubbleIsoFraction.toFixed(2);
             localStorage.setItem("bubbleIso", bubbleIsoFraction.toFixed(2));
@@ -691,6 +881,41 @@ const INDEX_HTML: &str = r##"<!doctype html>
       updateAnimUI();
       updateMixUI();
       updateRenderMode();
+
+      function setPanelCollapsed(collapsed, persist = true) {
+        panel.classList.toggle("collapsed", collapsed);
+        menuToggle.textContent = collapsed ? "Show" : "Hide";
+        panelDock.classList.toggle("show", collapsed);
+        if (persist) {
+          localStorage.setItem("panelCollapsed", collapsed ? "1" : "0");
+        }
+      }
+
+      const storedCollapsed = localStorage.getItem("panelCollapsed");
+      if (storedCollapsed === "1") {
+        setPanelCollapsed(true, false);
+      }
+      menuToggle.addEventListener("click", () => {
+        const next = !panel.classList.contains("collapsed");
+        setPanelCollapsed(next);
+      });
+      menuShow.addEventListener("click", () => {
+        setPanelCollapsed(false);
+      });
+
+      const sectionToggles = Array.from(document.querySelectorAll(".section-toggle"));
+      for (const toggle of sectionToggles) {
+        const targetId = toggle.dataset.target;
+        const body = targetId ? document.getElementById(targetId) : null;
+        if (body && body.classList.contains("open")) {
+          toggle.classList.add("open");
+        }
+        toggle.addEventListener("click", () => {
+          if (!body) return;
+          const isOpen = body.classList.toggle("open");
+          toggle.classList.toggle("open", isOpen);
+        });
+      }
 
       function updateOrbitalList(list, selectedLabel, selectedLabelB) {
         lastOrbitals = Array.isArray(list) ? list : [];
@@ -749,7 +974,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const superMode = mode === "superposition";
         const showBubbles = renderMode === "bubbles";
         valenceRow.style.display = mode === "valence" ? "flex" : "none";
-        basisRow.style.display = (orbitalMode || superMode) && showBubbles ? "flex" : "none";
+        basisRow.style.display = (orbitalMode || superMode) ? "flex" : "none";
         nInput.disabled = !(orbitalMode || superMode);
         lInput.disabled = !(orbitalMode || superMode);
         mInput.disabled = !(orbitalMode || superMode);
@@ -1034,7 +1259,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
         btn.dataset.name = el.name.toLowerCase();
         btn.addEventListener("click", () => {
           setActiveElementByZ(el.Z);
-          elementDropdown.classList.remove("open");
+          elementModal.classList.remove("open");
           resetCamera();
           fetchSamples().catch((err) => { statusEl.textContent = err.toString(); });
         });
@@ -1067,14 +1292,32 @@ const INDEX_HTML: &str = r##"<!doctype html>
         setActiveElementByZ(Number(zInput.value));
       }
 
-      elementButton.addEventListener("click", (e) => {
-        e.stopPropagation();
-        elementDropdown.classList.toggle("open");
+      function openElementModal() {
+        elementModal.classList.add("open");
+        elementSearch.focus();
+      }
+
+      function closeElementModal() {
+        elementModal.classList.remove("open");
+      }
+
+      elementButton.addEventListener("click", () => {
+        openElementModal();
       });
 
-      document.addEventListener("click", (e) => {
-        if (!elementDropdown.contains(e.target) && e.target !== elementButton) {
-          elementDropdown.classList.remove("open");
+      closeTableButton.addEventListener("click", () => {
+        closeElementModal();
+      });
+
+      elementModal.addEventListener("click", (e) => {
+        if (e.target === elementModal) {
+          closeElementModal();
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeElementModal();
         }
       });
 
@@ -1151,8 +1394,12 @@ const INDEX_HTML: &str = r##"<!doctype html>
         lastY = e.clientY;
         phi -= dx * 0.005;
         theta -= dy * 0.005;
-        const eps = 0.1;
-        theta = Math.max(eps, Math.min(Math.PI - eps, theta));
+        const twoPi = Math.PI * 2;
+        if (theta < 0) {
+          theta = (theta % twoPi) + twoPi;
+        } else if (theta > twoPi) {
+          theta = theta % twoPi;
+        }
         updateCamera();
       });
 
@@ -1232,6 +1479,32 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const h = ((t % 1) + 1) % 1;
         const [r, g, b] = hsvToRgb(h, 0.95, 0.95);
         return new THREE.Color(r, g, b);
+      }
+
+      function colorForIntensity(value, maxValue) {
+        const tRaw = maxValue > 0 ? Math.min(value / maxValue, 1) : 0;
+        const t = Math.pow(tRaw, 0.4);
+        const stops = [
+          { t: 0.0, c: [0.02, 0.02, 0.08] },
+          { t: 0.25, c: [0.25, 0.05, 0.45] },
+          { t: 0.55, c: [0.85, 0.2, 0.2] },
+          { t: 0.8, c: [0.98, 0.72, 0.2] },
+          { t: 1.0, c: [1.0, 1.0, 1.0] },
+        ];
+        let a = stops[0];
+        let b = stops[stops.length - 1];
+        for (let i = 0; i < stops.length - 1; i++) {
+          if (t >= stops[i].t && t <= stops[i + 1].t) {
+            a = stops[i];
+            b = stops[i + 1];
+            break;
+          }
+        }
+        const k = (t - a.t) / Math.max(1e-6, (b.t - a.t));
+        const r = a.c[0] + (b.c[0] - a.c[0]) * k;
+        const g = a.c[1] + (b.c[1] - a.c[1]) * k;
+        const bcol = a.c[2] + (b.c[2] - a.c[2]) * k;
+        return new THREE.Color(r, g, bcol);
       }
 
       function updateSuperpositionColors() {
@@ -1319,6 +1592,54 @@ const INDEX_HTML: &str = r##"<!doctype html>
         colorAttr.needsUpdate = true;
       }
 
+      function updateSuperpositionIntensityColors() {
+        if (!superPsi || !colorAttr || !superProb) {
+          return;
+        }
+        const psi1 = superPsi.psi1;
+        const psi2 = superPsi.psi2;
+        const deltaE = superPsi.deltaE || 0;
+        const isDegenerate = Math.abs(deltaE) < 1e-6;
+        const loopPeriod = 6.0;
+        const phaseSpeed = isDegenerate ? (Math.PI * 2.0 / loopPeriod) : deltaE;
+        const phase = phaseSpeed * superpositionTime;
+        const phaseRe = Math.cos(phase);
+        const phaseIm = -Math.sin(phase);
+        let maxProb = 0.0;
+        const count = superProb.length;
+        for (let i = 0; i < count; i++) {
+          const idx2 = i * 2;
+          const psi1Re = psi1[idx2 + 0];
+          const psi1Im = psi1[idx2 + 1];
+          const psi2ReBase = psi2[idx2 + 0];
+          const psi2ImBase = psi2[idx2 + 1];
+          const psi2Re = psi2ReBase * phaseRe - psi2ImBase * phaseIm;
+          const psi2Im = psi2ReBase * phaseIm + psi2ImBase * phaseRe;
+          const re = psi1Re + psi2Re;
+          const im = psi1Im + psi2Im;
+          const prob = re * re + im * im;
+          superProb[i] = prob;
+          if (prob > maxProb) {
+            maxProb = prob;
+          }
+        }
+        if (isDegenerate) {
+          if (!superPsi.baseMax || superPsi.baseMax <= 0) {
+            superPsi.baseMax = maxProb;
+          }
+          maxProb = superPsi.baseMax || maxProb;
+        }
+        const colors = colorAttr.array;
+        for (let i = 0; i < count; i++) {
+          const baseIdx = i * 3;
+          const c = colorForIntensity(superProb[i], maxProb);
+          colors[baseIdx + 0] = c.r;
+          colors[baseIdx + 1] = c.g;
+          colors[baseIdx + 2] = c.b;
+        }
+        colorAttr.needsUpdate = true;
+      }
+
       async function fetchSamples(forceTime = null, countOverride = null) {
         const n = Number(nInput.value);
         const l = Number(lInput.value);
@@ -1331,7 +1652,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const valenceStyle = valenceStyleSelect.value;
         const wantMorph = animateEnabled && mode === "superposition";
         const wantPhaseMode = renderMode === "dots" && dotColorMode === "phase";
-        const wantPsi = animateEnabled && mode === "superposition" && wantPhaseMode;
+        const wantIntensityMode = renderMode === "dots" && dotColorMode === "intensity";
+        const wantPsi = animateEnabled && mode === "superposition" && (wantPhaseMode || wantIntensityMode);
         const wantBubbles = renderMode === "bubbles";
         let effectiveCount = count;
         if (wantMorph) {
@@ -1353,8 +1675,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
         try {
           statusEl.textContent = forceTime !== null ? "Animating..." : "Sampling...";
           setActiveElementByZ(z);
-          const basisMode = renderMode === "bubbles" ? basisSelect.value : "complex";
-          const params = new URLSearchParams({ n, l, m, n2, l2, m2, z, count: effectiveCount, max, mode, mix, t, valence_style: valenceStyle, animated: wantPsi, bubble: wantBubbles, basis: basisMode, color_mode: wantPhaseMode ? "phase" : "radial" });
+          const basisMode = (mode === "orbital" || mode === "superposition") ? basisSelect.value : "complex";
+          const colorModeParam = wantPhaseMode ? "phase" : (wantIntensityMode ? "intensity" : "radial");
+          const params = new URLSearchParams({ n, l, m, n2, l2, m2, z, count: effectiveCount, max, mode, mix, t, valence_style: valenceStyle, animated: wantPsi, bubble: wantBubbles, basis: basisMode, color_mode: colorModeParam });
           const res = await fetch(`/samples?${params.toString()}`);
           if (!res.ok) {
             statusEl.textContent = "Error: " + res.status;
@@ -1377,7 +1700,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
           : (data.source === "pslibrary" ? "PSlibrary" : "Hydrogenic");
         const note = data.note ? ` | ${data.note}` : "";
         const modeLabel = data.mode || mode;
-        const basisLabel = (renderMode === "bubbles" && basisSelect.value === "real" && (modeLabel === "orbital" || modeLabel === "superposition"))
+        const basisLabel = (basisSelect.value === "real" && (modeLabel === "orbital" || modeLabel === "superposition"))
           ? " | real basis"
           : "";
         let detail = "total density";
@@ -1439,6 +1762,16 @@ const INDEX_HTML: &str = r##"<!doctype html>
         const usePhase = dotColorMode === "phase"
           && Array.isArray(data.phases)
           && data.phases.length === data.samples.length;
+        const useIntensity = dotColorMode === "intensity"
+          && Array.isArray(data.intensities)
+          && data.intensities.length === data.samples.length;
+        let maxIntensity = 0.0;
+        if (useIntensity) {
+          for (let i = 0; i < data.intensities.length; i++) {
+            const v = data.intensities[i];
+            if (v > maxIntensity) maxIntensity = v;
+          }
+        }
         for (let i = 0; i < data.samples.length; i++) {
           const p = data.samples[i];
           positions[i * 3 + 0] = p[0] * 0.1;
@@ -1447,6 +1780,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
           let c;
           if (usePhase) {
             c = colorForPhase(data.phases[i]);
+          } else if (useIntensity) {
+            c = colorForIntensity(data.intensities[i], maxIntensity);
           } else {
             const dist = Math.sqrt(p[0]*p[0] + p[1]*p[1] + p[2]*p[2]) * 0.1;
             c = colorForDistance(dist, data.max_radius * 0.1);
@@ -1454,6 +1789,55 @@ const INDEX_HTML: &str = r##"<!doctype html>
           colors[i * 3 + 0] = c.r;
           colors[i * 3 + 1] = c.g;
           colors[i * 3 + 2] = c.b;
+        }
+
+        const mValue = Number.isFinite(Number(data.m)) ? Number(data.m) : 0;
+        if (renderMode === "dots" && modeLabel === "orbital" && mValue !== 0) {
+          spinPhi0 = new Float32Array(data.samples.length);
+          spinRho = new Float32Array(data.samples.length);
+          spinOmega = new Float32Array(data.samples.length);
+          spinZ = new Float32Array(data.samples.length);
+          const mSign = mValue >= 0 ? 1 : -1;
+          const mScale = Math.max(1, Math.abs(mValue));
+          let maxR = 0.0;
+          for (let i = 0; i < data.samples.length; i++) {
+            const x = positions[i * 3 + 0];
+            const y = positions[i * 3 + 1];
+            const z = positions[i * 3 + 2];
+            const r = Math.sqrt(x * x + y * y + z * z);
+            if (r > maxR) maxR = r;
+          }
+          const invMaxR = maxR > 0 ? 1.0 / maxR : 1.0;
+          const maxI = useIntensity && maxIntensity > 0 ? maxIntensity : 1.0;
+          for (let i = 0; i < data.samples.length; i++) {
+            const baseIdx = i * 3;
+            const x0 = positions[baseIdx + 0];
+            const y0 = positions[baseIdx + 1];
+            const z0 = positions[baseIdx + 2];
+            const rho = Math.sqrt(x0 * x0 + y0 * y0);
+            const phi0 = Math.atan2(y0, x0);
+            let norm;
+            if (useIntensity) {
+              norm = Math.min(data.intensities[i] / maxI, 1.0);
+            } else {
+              const r = Math.sqrt(x0 * x0 + y0 * y0 + z0 * z0);
+              norm = 1.0 - Math.min(r * invMaxR, 1.0);
+            }
+            const curve = Math.pow(norm, 1.6);
+            const base = 0.05;
+            const max = 2.8;
+            const omega = (base + (max - base) * curve) * mScale * mSign;
+            spinPhi0[i] = phi0;
+            spinRho[i] = rho;
+            spinZ[i] = z0;
+            spinOmega[i] = omega;
+          }
+          spinTime = 0;
+        } else {
+          spinPhi0 = null;
+          spinRho = null;
+          spinOmega = null;
+          spinZ = null;
         }
 
         const reuse = points && posAttr && positions.length === posAttr.array.length;
@@ -1489,7 +1873,7 @@ const INDEX_HTML: &str = r##"<!doctype html>
         baseColors = new Float32Array(colors);
 
           const material = new THREE.PointsMaterial({
-            size: 0.002,
+            size: dotSize,
             vertexColors: true,
             transparent: true,
             opacity: 0.6,
@@ -1512,6 +1896,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
         if (modeLabel === "superposition" && animateEnabled && superPsi) {
           if (dotColorMode === "phase") {
             updateSuperpositionPhaseColors();
+          } else if (dotColorMode === "intensity") {
+            updateSuperpositionIntensityColors();
           } else {
             updateSuperpositionColors();
           }
@@ -1574,6 +1960,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
           if (superPsi) {
             if (dotColorMode === "phase") {
               updateSuperpositionPhaseColors();
+            } else if (dotColorMode === "intensity") {
+              updateSuperpositionIntensityColors();
             } else {
               updateSuperpositionColors();
             }
@@ -1585,6 +1973,27 @@ const INDEX_HTML: &str = r##"<!doctype html>
               .catch((err) => { statusEl.textContent = err.toString(); })
               .finally(() => { superFetchInFlight = false; });
           }
+        }
+        const orbitalSpinEnabled = modeSelect.value === "orbital"
+          && renderMode === "dots"
+          && spinPhi0
+          && spinRho
+          && spinOmega
+          && spinZ
+          && posAttr;
+        if (orbitalSpinEnabled) {
+          spinTime += dt * animSpeed;
+          const arr = posAttr.array;
+          const count = spinOmega.length;
+          for (let i = 0; i < count; i++) {
+            const baseIdx = i * 3;
+            const theta = spinPhi0[i] + spinTime * spinOmega[i];
+            const rho = spinRho[i];
+            arr[baseIdx + 0] = rho * Math.cos(theta);
+            arr[baseIdx + 1] = rho * Math.sin(theta);
+            arr[baseIdx + 2] = spinZ[i];
+          }
+          posAttr.needsUpdate = true;
         }
         if (renderMode === "bubbles" && posAttr && bubbleDirty && (now - lastBubbleUpdate) > bubbleUpdateInterval) {
           lastBubbleUpdate = now;
@@ -1647,172 +2056,469 @@ const INFO_HTML: &str = r##"<!doctype html>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; background: radial-gradient(1200px 800px at 20% 10%, #111727 0%, #090b10 55%, #06070b 100%); color: #e7edf5; font-family: "Space Grotesk", "Segoe UI", sans-serif; }
+      :root {
+        --bg: #070b10;
+        --panel: rgba(12, 16, 24, 0.88);
+        --panel-2: rgba(10, 14, 20, 0.75);
+        --border: #1b2534;
+        --text: #e7edf5;
+        --muted: #98a4b4;
+        --muted-2: #728195;
+        --accent: #4aa3ff;
+        --accent-2: #46d7c6;
+        --accent-3: #f7b059;
+      }
+      html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: "Space Grotesk", "Segoe UI", sans-serif; }
       body::before {
         content: "";
         position: fixed;
         inset: 0;
         background-image:
-          linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
-        background-size: 48px 48px;
-        opacity: 0.15;
+          radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+          radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px);
+        background-size: 120px 120px, 26px 26px;
+        opacity: 0.35;
         pointer-events: none;
       }
-      .page { max-width: 980px; margin: 0 auto; padding: 28px; }
-      .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-      .title { font-size: 26px; font-weight: 600; letter-spacing: 0.03em; }
-      .back { background: #111722; border: 1px solid #2b3545; color: #e7edf5; border-radius: 10px; padding: 8px 12px; font-size: 12px; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
-      .back:hover { border-color: #4aa3ff; color: #ffffff; }
-      h2 { margin-top: 28px; font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase; color: #b2becc; }
-      p, li { color: #c7cdd6; line-height: 1.65; }
-      code, pre { background: #0f141d; padding: 10px 12px; border-radius: 8px; display: block; overflow-x: auto; border: 1px solid #1e2a3a; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-      .card { background: rgba(16, 20, 29, 0.92); border: 1px solid #1f2a3a; border-radius: 12px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
-      .hero { background: linear-gradient(135deg, rgba(70,215,198,0.08), rgba(74,163,255,0.08)); border: 1px solid #283244; }
-      .accent-line { height: 2px; width: 54px; background: linear-gradient(90deg, #46d7c6, #f7b059); border-radius: 999px; margin-top: 6px; }
-      @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+      #infoApp {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        grid-template-rows: auto 1fr;
+        grid-template-areas: "header header" "nav content";
+        gap: 22px;
+        min-height: 100vh;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      .info-header { grid-area: header; display: flex; align-items: center; justify-content: space-between; }
+      .info-title { font-size: 28px; font-weight: 600; letter-spacing: 0.03em; }
+      .info-subtitle { margin-top: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.22em; color: var(--muted-2); }
+      .back { background: #111722; border: 1px solid #2b3545; color: var(--text); border-radius: 10px; padding: 8px 12px; font-size: 12px; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
+      .back:hover { border-color: var(--accent); color: #ffffff; }
+
+      .info-nav {
+        grid-area: nav;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: calc(100vh - 140px);
+        position: sticky;
+        top: 24px;
+        overflow: hidden;
+      }
+      .nav-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.22em; color: var(--muted-2); }
+      #navSearch { width: 100%; background: #0c121b; border: 1px solid #263042; border-radius: 10px; padding: 8px 10px; color: var(--text); font-size: 12px; }
+      .nav-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; flex: 1; min-height: 0; }
+      .nav-item { text-align: left; background: transparent; border: 1px solid #202a3a; color: var(--text); padding: 8px 10px; border-radius: 10px; font-size: 13px; cursor: pointer; }
+      .nav-item:hover { border-color: var(--accent); }
+      .nav-item.active { background: #152234; border-color: var(--accent); color: #e9f4ff; box-shadow: 0 8px 18px rgba(0,0,0,0.25); }
+      .nav-hint { font-size: 12px; color: var(--muted-2); line-height: 1.5; margin-top: auto; }
+
+      .info-content {
+        grid-area: content;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 140px);
+      }
+      .content-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1a2230; padding-bottom: 10px; margin-bottom: 12px; }
+      .content-header-title { font-size: 20px; font-weight: 600; }
+      .content-meta { font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted-2); }
+      .section-container { flex: 1; overflow-y: auto; padding-right: 8px; }
+      .info-section { display: none; animation: fadeIn 0.2s ease; }
+      .info-section.active { display: block; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+      .card { background: var(--panel-2); border: 1px solid #1b2433; border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+      .card h3 { margin: 0 0 8px 0; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: #c4d0e0; }
+      p { color: #c7d1df; line-height: 1.7; margin: 0 0 10px 0; }
+      ul { margin: 0; padding-left: 18px; color: #c7d1df; line-height: 1.7; }
+      li { margin-bottom: 6px; }
+      pre { background: #0b1017; border: 1px solid #1f2a3a; border-radius: 10px; padding: 10px 12px; color: #d7e2f2; overflow-x: auto; }
+      .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+      .tag { display: inline-flex; align-items: center; gap: 6px; background: #0d141f; border: 1px solid #263042; border-radius: 999px; padding: 4px 10px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.14em; }
+      .diagram-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+      .diagram-tab { background: #0d141f; border: 1px solid #263042; color: var(--text); border-radius: 10px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+      .diagram-tab.active { border-color: var(--accent-2); color: #e9f4ff; }
+      .diagram-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .diagram { display: none; background: #0b111a; border: 1px solid #1f2a3a; border-radius: 12px; padding: 12px; text-align: center; }
+      .diagram.active { display: block; }
+      .diagram svg { width: 100%; height: auto; max-height: 220px; }
+      .diagram figcaption { margin-top: 8px; font-size: 12px; color: var(--muted); }
+      .equation-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .equation-card { background: #0b111a; border: 1px solid #1f2a3a; border-radius: 12px; padding: 12px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #1b2534; }
+      th { text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; color: var(--muted-2); }
+
+      @media (max-width: 980px) {
+        #infoApp { grid-template-columns: 1fr; grid-template-areas: "header" "nav" "content"; }
+        .info-nav, .info-content { height: auto; position: static; }
+        .grid-2, .grid-3, .equation-grid, .diagram-grid { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
-    <div class="page">
-      <div class="topbar">
+    <div id="infoApp">
+      <header class="info-header">
         <div>
-          <div class="title">Quantum Orbitals 3D - Info</div>
-          <div class="accent-line"></div>
+          <div class="info-title">Quantum Orbitals 3D</div>
+          <div class="info-subtitle">Physics reference and UI guide</div>
         </div>
         <a class="back" href="/">Back to app</a>
-      </div>
+      </header>
 
-      <div class="card hero">
-        <p>This page is a full physics and usage reference for the visualizer. It explains the underlying models, how the UI maps to physical quantities, and how the animation is generated.</p>
-      </div>
-
-      <h2>How To Use</h2>
-      <div class="grid">
-        <div class="card">
-          <p>Choose an element from the dropdown, or edit Z directly, then click Generate.</p>
-          <p>Select a mode:</p>
-          <ul>
-            <li>Total density: all occupied orbitals, spherical average</li>
-            <li>Valence density: outermost occupied orbitals</li>
-            <li>Single orbital: one (n, l, m) state</li>
-            <li>Superposition: two orbitals with time evolution</li>
-          </ul>
+      <aside class="info-nav">
+        <div class="nav-title">Explore</div>
+        <input id="navSearch" type="text" placeholder="Filter topics" />
+        <div id="navList" class="nav-list">
+          <button class="nav-item active" data-target="overview" data-title="Overview">Overview</button>
+          <button class="nav-item" data-target="quantum" data-title="Quantum Numbers">Quantum numbers</button>
+          <button class="nav-item" data-target="hydrogenic" data-title="Hydrogenic Model">Hydrogenic model</button>
+          <button class="nav-item" data-target="angular" data-title="Angular Shapes">Angular shapes</button>
+          <button class="nav-item" data-target="radial" data-title="Radial Structure">Radial structure</button>
+          <button class="nav-item" data-target="many" data-title="Many Electron Atoms">Many electron atoms</button>
+          <button class="nav-item" data-target="rendering" data-title="Sampling and Rendering">Sampling and rendering</button>
+          <button class="nav-item" data-target="color" data-title="Color and Phase">Color and phase</button>
+          <button class="nav-item" data-target="superposition" data-title="Superposition">Superposition</button>
+          <button class="nav-item" data-target="glossary" data-title="UI Glossary">UI glossary</button>
+          <button class="nav-item" data-target="limits" data-title="Limitations">Limitations</button>
         </div>
-        <div class="card">
-          <p>Controls:</p>
-          <ul>
-            <li>Drag to orbit</li>
-            <li>Scroll to zoom</li>
-            <li>WASD to move the camera target</li>
-            <li>Reset camera returns to default view</li>
-          </ul>
+        <div class="nav-hint">Click a topic to load the full section. The content switches instantly without hunting through long pages.</div>
+      </aside>
+
+      <main class="info-content">
+        <div class="content-header">
+          <div id="sectionTitle" class="content-header-title">Overview</div>
+          <div class="content-meta">Physics and UI</div>
         </div>
-      </div>
+        <div class="section-container">
+          <section id="overview" class="info-section active">
+            <div class="card">
+              <h3>What this visualizer shows</h3>
+              <p>The dots and bubbles visualize the probability density of an electron in an atom. Each dot is a Monte Carlo sample from |psi|^2, and each bubble is an isosurface derived from the same density. These are not particle paths. They are spatial probability distributions.</p>
+              <p>The app supports hydrogenic orbitals, LDA single particle densities where available, and time dependent superpositions of two orbitals. Use the menu to switch between total density, valence density, single orbital, or superposition modes.</p>
+            </div>
+            <div class="grid-2">
+              <div class="card">
+                <h3>Getting started</h3>
+                <ul>
+                  <li>Select an element from the periodic table or edit Z and click Generate.</li>
+                  <li>Choose dots for raw samples or bubbles for smooth isosurfaces.</li>
+                  <li>Pick a mode and adjust quantum numbers for single orbital and superposition views.</li>
+                  <li>Enable Animated to see time dependent interference in superposition mode.</li>
+                </ul>
+              </div>
+              <div class="card">
+                <h3>Controls</h3>
+                <ul>
+                  <li>Drag to orbit the camera around the nucleus.</li>
+                  <li>Scroll to zoom in and out.</li>
+                  <li>WASD moves the camera target within bounds.</li>
+                  <li>Reset camera returns to the default view.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
 
-      <h2>UI Terms</h2>
-      <div class="card">
-        <ul>
-          <li>n: principal quantum number</li>
-          <li>l: azimuthal quantum number (s=0, p=1, d=2, f=3, ...)</li>
-          <li>m: magnetic quantum number (orientation)</li>
-          <li>basis: complex Y_lm or real combinations used in chemistry</li>
-          <li>dot color: radial distance or wavefunction phase</li>
-          <li>cnt: number of sample points drawn</li>
-          <li>max: maximum radial extent used for sampling</li>
-          <li>mix: superposition weight between orbital A and B</li>
-        </ul>
-      </div>
+          <section id="quantum" class="info-section">
+            <div class="card">
+              <h3>Quantum numbers</h3>
+              <p>An orbital is labeled by three quantum numbers: n, l, and m. These arise from separation of the Schrodinger equation in spherical coordinates and fully specify a stationary state.</p>
+              <ul>
+                <li>n is the principal quantum number. It controls the energy in hydrogenic atoms and the overall radial scale.</li>
+                <li>l is the orbital angular momentum quantum number. It sets the lobe pattern. l = 0, 1, 2, 3 correspond to s, p, d, f.</li>
+                <li>m is the magnetic quantum number, which selects the orientation or azimuthal structure. m ranges from -l to +l.</li>
+              </ul>
+              <p>Hydrogenic energy depends only on n, so all states with the same n are degenerate. This matters for superposition animation.</p>
+              <p>The number of angular nodes equals l, and the number of radial nodes equals n - l - 1. Together they determine the lobe count and the number of radial shells.</p>
+            </div>
+          </section>
 
-      <h2>What The Dots Represent</h2>
-      <div class="card">
-        <p>Each dot is a Monte Carlo sample from the probability density |psi|^2. Dots are not particle trajectories. Dense regions indicate higher probability of finding an electron.</p>
-      </div>
+          <section id="hydrogenic" class="info-section">
+            <div class="card">
+              <h3>Hydrogenic model</h3>
+              <p>Hydrogenic orbitals solve the time independent Schrodinger equation for a Coulomb potential. In atomic units:</p>
+              <pre>[-1/2 * nabla^2 - Z / r] psi(r) = E psi(r)</pre>
+              <p>Separation of variables yields:</p>
+              <pre>psi(n,l,m)(r,theta,phi) = R_nl(r) * Y_lm(theta,phi)</pre>
+              <p>The energy depends on n only:</p>
+              <pre>E_n = -Z^2 / (2 n^2)</pre>
+              <p>Angular structure comes from Y_lm, while radial structure comes from R_nl. The visualizer uses analytical R_nl and Y_lm to generate samples.</p>
+              <p>Closed form solutions use associated Laguerre polynomials for R_nl and spherical harmonics for Y_lm. Atomic units set hbar = 1, m_e = 1, and e = 1, simplifying the equations.</p>
+            </div>
+            <div class="equation-grid">
+              <div class="equation-card">
+                <h3>Radial probability</h3>
+                <pre>P(r) = r^2 * |R_nl(r)|^2</pre>
+                <p>The r^2 term is why s orbitals still peak away from r = 0 even though R_nl is finite at the origin.</p>
+              </div>
+              <div class="equation-card">
+                <h3>Angular probability</h3>
+                <pre>P(theta,phi) = |Y_lm(theta,phi)|^2</pre>
+                <p>This function defines the nodal planes and the number of lobes in the orbital.</p>
+              </div>
+              <div class="equation-card">
+                <h3>Energy ladder</h3>
+                <svg viewBox="0 0 220 160" aria-label="energy ladder">
+                  <line x1="40" y1="130" x2="180" y2="130" stroke="#344052" stroke-width="2"></line>
+                  <line x1="60" y1="110" x2="160" y2="110" stroke="#4aa3ff" stroke-width="3"></line>
+                  <line x1="70" y1="80" x2="150" y2="80" stroke="#4aa3ff" stroke-width="3"></line>
+                  <line x1="80" y1="55" x2="140" y2="55" stroke="#4aa3ff" stroke-width="3"></line>
+                  <text x="22" y="113" fill="#8a98ac" font-size="10">n=1</text>
+                  <text x="22" y="83" fill="#8a98ac" font-size="10">n=2</text>
+                  <text x="22" y="58" fill="#8a98ac" font-size="10">n=3</text>
+                </svg>
+                <p>Energy scales as -Z^2 / (2 n^2), so the levels get closer together as n increases.</p>
+              </div>
+            </div>
+          </section>
 
-      <h2>What The Colors Mean</h2>
-      <div class="card">
-        <p>In radial mode, color encodes distance from the nucleus. The gradient runs from blue near the core through cyan and green to yellow at larger radii.</p>
-        <p>In phase mode, color encodes the complex phase angle of psi. This is a visualization aid, not a directly observable quantity in |psi|^2.</p>
-      </div>
+          <section id="angular" class="info-section">
+            <div class="card">
+              <h3>Angular shapes and real orbitals</h3>
+              <p>The complex spherical harmonics Y_lm have a phase factor exp(i m phi). For a single complex Y_lm, the density |Y_lm|^2 is often azimuthally symmetric, producing rings or shells. Chemistry diagrams usually use real linear combinations of Y_lm and Y_l,-m to create lobes with clear nodal planes.</p>
+              <p>Use the Basis selector in orbital and superposition views (dots or bubbles) to switch between complex and real orbitals.</p>
+              <p>Red and blue indicate the sign of psi in bubbles mode. Nodal surfaces separate regions of opposite sign.</p>
+            </div>
+            <div class="card">
+              <div class="diagram-tabs">
+                <button class="diagram-tab active" data-diagram-group="orbitals" data-diagram-tab="s">s orbital</button>
+                <button class="diagram-tab" data-diagram-group="orbitals" data-diagram-tab="p">p orbital</button>
+                <button class="diagram-tab" data-diagram-group="orbitals" data-diagram-tab="d">d orbital</button>
+                <button class="diagram-tab" data-diagram-group="orbitals" data-diagram-tab="f">f orbital</button>
+              </div>
+              <div class="diagram-grid">
+                <figure class="diagram active" data-diagram-group="orbitals" data-diagram="s">
+                  <svg viewBox="0 0 200 200" aria-label="s orbital">
+                    <circle cx="100" cy="100" r="60" fill="#ff5c5c" opacity="0.85"></circle>
+                    <circle cx="100" cy="100" r="60" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2"></circle>
+                  </svg>
+                  <figcaption>S orbitals are spherically symmetric. There is no angular node.</figcaption>
+                </figure>
+                <figure class="diagram" data-diagram-group="orbitals" data-diagram="p">
+                  <svg viewBox="0 0 200 200" aria-label="p orbital">
+                    <ellipse cx="100" cy="60" rx="42" ry="32" fill="#ff5c5c" opacity="0.85"></ellipse>
+                    <ellipse cx="100" cy="140" rx="42" ry="32" fill="#4b68ff" opacity="0.85"></ellipse>
+                    <rect x="20" y="98" width="160" height="4" fill="#202a3a"></rect>
+                  </svg>
+                  <figcaption>P orbitals have one nodal plane and two lobes with opposite sign.</figcaption>
+                </figure>
+                <figure class="diagram" data-diagram-group="orbitals" data-diagram="d">
+                  <svg viewBox="0 0 200 200" aria-label="d orbital">
+                    <ellipse cx="60" cy="60" rx="26" ry="20" fill="#ff5c5c" opacity="0.85"></ellipse>
+                    <ellipse cx="140" cy="60" rx="26" ry="20" fill="#4b68ff" opacity="0.85"></ellipse>
+                    <ellipse cx="60" cy="140" rx="26" ry="20" fill="#4b68ff" opacity="0.85"></ellipse>
+                    <ellipse cx="140" cy="140" rx="26" ry="20" fill="#ff5c5c" opacity="0.85"></ellipse>
+                  </svg>
+                  <figcaption>D orbitals have two angular nodes and four main lobes.</figcaption>
+                </figure>
+                <figure class="diagram" data-diagram-group="orbitals" data-diagram="f">
+                  <svg viewBox="0 0 200 200" aria-label="f orbital">
+                    <circle cx="60" cy="40" r="18" fill="#ff5c5c" opacity="0.85"></circle>
+                    <circle cx="140" cy="40" r="18" fill="#4b68ff" opacity="0.85"></circle>
+                    <circle cx="40" cy="100" r="18" fill="#4b68ff" opacity="0.85"></circle>
+                    <circle cx="160" cy="100" r="18" fill="#ff5c5c" opacity="0.85"></circle>
+                    <circle cx="60" cy="160" r="18" fill="#ff5c5c" opacity="0.85"></circle>
+                    <circle cx="140" cy="160" r="18" fill="#4b68ff" opacity="0.85"></circle>
+                  </svg>
+                  <figcaption>F orbitals add more angular nodes and complex lobe structures.</figcaption>
+                </figure>
+              </div>
+            </div>
+          </section>
 
-      <h2>Dots vs Bubbles</h2>
-      <div class="card">
-        <p>Dots mode renders the raw Monte Carlo samples. Bubbles mode builds a smooth isosurface from those samples and renders it as a closed surface.</p>
-        <p>When a phase sign is defined (single orbital and superposition), positive regions are shown in red and negative regions in blue. Density-only modes do not have a sign, so only one surface is shown.</p>
-      </div>
+          <section id="radial" class="info-section">
+            <div class="card">
+              <h3>Radial structure and nodes</h3>
+              <p>Radial nodes are spherical shells where the wavefunction changes sign. The number of radial nodes equals n - l - 1. Increasing n adds more shells and pushes probability outward, while increasing l changes the angular structure without adding radial nodes.</p>
+            </div>
+            <div class="card">
+              <div class="diagram-grid">
+                <figure class="diagram active" data-diagram="radial">
+                  <svg viewBox="0 0 260 180" aria-label="radial probability">
+                    <line x1="30" y1="150" x2="240" y2="150" stroke="#354055" stroke-width="2"></line>
+                    <line x1="30" y1="150" x2="30" y2="20" stroke="#354055" stroke-width="2"></line>
+                    <path d="M30 140 C60 40, 120 30, 180 110 C210 150, 230 140, 240 120" fill="none" stroke="#46d7c6" stroke-width="3"></path>
+                    <text x="210" y="165" fill="#8897ab" font-size="10">r</text>
+                    <text x="10" y="30" fill="#8897ab" font-size="10">P(r)</text>
+                  </svg>
+                  <figcaption>Radial probability includes an r^2 factor, producing a peak away from the origin even for s orbitals.</figcaption>
+                </figure>
+              </div>
+            </div>
+          </section>
 
-      <h2>Real Orbital Basis</h2>
-      <div class="card">
-        <p>The default complex spherical harmonics Y_lm have a phase factor e^{im phi}, so |Y_lm|^2 is independent of phi. This produces azimuthally symmetric shapes (rings or shells).</p>
-        <p>The real basis combines m and -m to form real-valued orbitals with explicit phi dependence. This produces the familiar textbook lobes for p, d, and f orbitals. Select Real (chemistry) in the Basis selector to view those shapes.</p>
-      </div>
+          <section id="many" class="info-section">
+            <div class="card">
+              <h3>Many electron atoms</h3>
+              <p>For heavier elements the visualizer uses LDA radial functions when available. LDA is a Kohn-Sham density functional approximation that replaces the many body problem with an effective single particle potential. The output is a set of radial functions and occupancies for each orbital channel.</p>
+              <p>Electron screening reduces the effective nuclear charge for outer shells. That is why valence orbitals are larger and more diffuse than the hydrogenic Z scaling alone would suggest.</p>
+              <ul>
+                <li>Total density sums all occupied orbitals, producing a spherical average.</li>
+                <li>Valence density isolates the outermost occupied shells.</li>
+                <li>Single orbital shows one selected (n, l) channel combined with Y_lm.</li>
+              </ul>
+              <p>LDA orbitals are not m resolved, so valence lobe mode uses m = 0 for shape visualization.</p>
+            </div>
+          </section>
 
-      <h2>Hydrogenic Physics Model</h2>
-      <div class="card">
-        <p>The hydrogenic model solves the time-independent Schrodinger equation in atomic units:</p>
-        <pre>[-1/2 * nabla^2 - Z/r] psi(r) = E psi(r)</pre>
-        <p>Separation of variables in spherical coordinates gives:</p>
-        <pre>psi(n,l,m)(r,theta,phi) = R_nl(r) * Y_lm(theta,phi)</pre>
-        <p>Quantum numbers:</p>
-        <ul>
-          <li>n = 1, 2, 3, ... (shell index)</li>
-          <li>l = 0 to n-1 (orbital shape)</li>
-          <li>m = -l to +l (orientation)</li>
-        </ul>
-        <p>Energy depends only on n:</p>
-        <pre>E_n = -Z^2 / (2 n^2)</pre>
-      </div>
+          <section id="rendering" class="info-section">
+            <div class="card">
+              <h3>Sampling and rendering</h3>
+              <p>Dots mode uses Monte Carlo rejection sampling in spherical coordinates. Radial samples are drawn from the radial probability distribution, and angular samples are accepted according to |Y_lm|^2. The count parameter controls the number of samples and therefore the noise level.</p>
+              <p>Bubbles mode converts the point cloud into a smooth density grid and extracts an isosurface. The threshold control sets which density fraction becomes the surface. Lower thresholds show more diffuse lobes. Higher thresholds highlight the dense core.</p>
+              <p>The surface is built from a kernel smoothed density, so it is an approximation of |psi|^2 and depends on grid resolution as well as the threshold.</p>
+              <p>The Quality slider adjusts bubble grid resolution and the number of samples used to build the density field. Higher quality looks smoother but costs more performance.</p>
+            </div>
+            <div class="grid-2">
+              <div class="card">
+                <h3>Dots</h3>
+                <p>Fast and faithful to the raw samples. Ideal for exploring high n orbitals and superpositions without heavy meshing costs.</p>
+              </div>
+              <div class="card">
+                <h3>Bubbles</h3>
+                <p>Shows the orbital as a continuous surface. Positive and negative lobes appear in red and blue when the sign of psi is defined.</p>
+              </div>
+            </div>
+          </section>
 
-      <h2>Radial And Angular Structure</h2>
-      <div class="card">
-        <p>The angular part Y_lm is a spherical harmonic that sets the lobe pattern. Nodes are surfaces where psi = 0. The radial part R_nl controls shell structure and radial nodes.</p>
-        <p>The radial probability density is:</p>
-        <pre>P(r) = r^2 |R_nl(r)|^2</pre>
-        <p>This is why most electron density does not sit at r = 0 even for s orbitals.</p>
-      </div>
+          <section id="color" class="info-section">
+            <div class="card">
+              <h3>Color and phase</h3>
+              <p>Dots can be colored by radial distance or by the complex phase of the wavefunction. Phase is not observable directly in |psi|^2, but it is essential for interference and superposition. Bubbles use red and blue to indicate positive and negative regions of psi when sign is defined.</p>
+              <p>Phase hue mapping uses h = (phase + pi) / (2 pi) * 360 degrees with saturation and value set to 0.95. This means phase = -pi or +pi maps to red, phase = -pi/2 maps near yellow-green, phase = 0 maps to cyan, and phase = +pi/2 maps near purple-blue.</p>
+              <p>Intensity mode maps |psi|^2 to a heat-style gradient from deep violet through red and gold to white, emphasizing the highest probability density regions.</p>
+            </div>
+            <div class="card">
+              <div class="diagram-grid">
+                <figure class="diagram active" data-diagram="phase">
+                  <svg viewBox="0 0 200 200" aria-label="phase wheel">
+                    <defs>
+                      <linearGradient id="phaseGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#ff4d4d" />
+                        <stop offset="25%" stop-color="#f7b059" />
+                        <stop offset="50%" stop-color="#46d7c6" />
+                        <stop offset="75%" stop-color="#4aa3ff" />
+                        <stop offset="100%" stop-color="#ff4d4d" />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="100" cy="100" r="70" fill="none" stroke="url(#phaseGrad)" stroke-width="18"></circle>
+                    <text x="72" y="105" fill="#95a4b8" font-size="12">phase</text>
+                  </svg>
+                  <figcaption>Phase coloring wraps continuously. Opposite colors represent phase shifts of approximately pi.</figcaption>
+                </figure>
+              </div>
+            </div>
+          </section>
 
-      <h2>Superposition And Time Evolution</h2>
-      <div class="card">
-        <p>A single stationary eigenstate has a global phase exp(-i E t). The probability density |psi|^2 is time independent, so a single orbital does not animate in a physically meaningful way.</p>
-        <p>Time dependence appears when combining at least two eigenstates with different energies:</p>
-        <pre>psi(r,t) = a * psi1(r) + b * psi2(r) * exp(-i * DeltaE * t)</pre>
-        <p>The density includes an interference term:</p>
-        <pre>|psi|^2 = |a psi1|^2 + |b psi2|^2 + 2 Re[a b* psi1 psi2* exp(-i DeltaE t)]</pre>
-        <p>If DeltaE = 0 (degenerate states with the same n in the hydrogenic model), the density is static. The app loops the phase in that case for visual continuity.</p>
-      </div>
+          <section id="superposition" class="info-section">
+            <div class="card">
+              <h3>Superposition and time evolution</h3>
+              <p>A single eigenstate evolves only by a global phase factor exp(-i E t). The probability density is static. True animation requires at least two orbitals with different energies.</p>
+              <pre>psi(r,t) = a * psi1(r) + b * psi2(r) * exp(-i * DeltaE * t)</pre>
+              <pre>|psi|^2 = |a psi1|^2 + |b psi2|^2 + 2 Re[a b* psi1 psi2* exp(-i DeltaE t)]</pre>
+              <p>The interference term produces real spatial motion in the density. In the hydrogenic model, states with the same n are degenerate, so DeltaE = 0 and the density does not evolve. Choose orbitals with different n for visible dynamics.</p>
+              <p>The oscillation period is T = 2 pi / DeltaE in atomic units. Larger energy gaps yield faster beat motion.</p>
+            </div>
+            <div class="card">
+              <div class="diagram-grid">
+                <figure class="diagram active" data-diagram="beat">
+                  <svg viewBox="0 0 260 180" aria-label="beat pattern">
+                    <line x1="20" y1="90" x2="240" y2="90" stroke="#2f3948" stroke-width="2"></line>
+                    <path d="M20 90 C50 30, 90 150, 120 90 C150 30, 190 150, 220 90" fill="none" stroke="#4aa3ff" stroke-width="3"></path>
+                    <path d="M20 90 C50 50, 90 130, 120 90 C150 50, 190 130, 220 90" fill="none" stroke="#f7b059" stroke-width="2" opacity="0.7"></path>
+                  </svg>
+                  <figcaption>Two close frequencies produce a beat pattern. The superposition density oscillates with DeltaE.</figcaption>
+                </figure>
+              </div>
+            </div>
+          </section>
 
-      <h2>How The Animation Is Rendered</h2>
-      <div class="card">
-        <p>Superposition uses repeated sampling to build successive point clouds. The UI morphs point positions between clouds to create smooth motion. This shows evolving density, not electron paths.</p>
-        <p>In bubbles mode, the isosurface is rebuilt from the current samples and updated at a fixed cadence for a smoother appearance.</p>
-        <p>More points (cnt) reduce Monte Carlo noise but take longer to sample.</p>
-      </div>
+          <section id="glossary" class="info-section">
+            <div class="card">
+              <h3>UI glossary</h3>
+              <table>
+                <thead>
+                  <tr><th>Control</th><th>Meaning</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Render</td><td>Dots shows samples, Bubbles shows an isosurface.</td></tr>
+                  <tr><td>Mode</td><td>Total density, valence density, single orbital, or superposition.</td></tr>
+                  <tr><td>Basis</td><td>Complex (m) or real chemistry combinations for orbital lobes.</td></tr>
+                  <tr><td>n, l, m</td><td>Quantum numbers that define a single orbital.</td></tr>
+                  <tr><td>cnt</td><td>Number of Monte Carlo samples to draw.</td></tr>
+                  <tr><td>max</td><td>Maximum radius for sampling. Larger values show more diffuse tails.</td></tr>
+                  <tr><td>mix</td><td>Superposition weight between orbital A and B.</td></tr>
+                  <tr><td>Animated</td><td>Enables time dependent evolution in superposition mode.</td></tr>
+                  <tr><td>Speed</td><td>Scales the animation time variable.</td></tr>
+                  <tr><td>Threshold</td><td>Bubble isosurface level as a fraction of peak density.</td></tr>
+                  <tr><td>Quality</td><td>Bubble grid resolution and sample count preset.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-      <h2>Multi-Electron Densities (LDA)</h2>
-      <div class="card">
-        <p>When available, OpenMX LDA radial wavefunctions and occupancies are used. Two density views are built:</p>
-        <ul>
-          <li>Total density: sum of all occupied orbitals (spherical average)</li>
-          <li>Valence density: sum of outermost occupied orbitals</li>
-        </ul>
-        <p>Single-orbital view uses the selected radial function and Y_lm. In valence lobe mode, m is set to 0 because LDA data is not m-resolved.</p>
-      </div>
-
-      <h2>Fallbacks And Approximations</h2>
-      <div class="card">
-        <ul>
-          <li>PSLibrary data is used for single-orbital fallback when LDA is missing.</li>
-          <li>Superposition uses hydrogenic orbitals for any element and scales coordinates by 1/Z.</li>
-          <li>This is not a full time-dependent many-body solver.</li>
-        </ul>
-      </div>
-
-      <h2>Sampling Method</h2>
-      <div class="card">
-        <p>Sampling uses rejection sampling in spherical coordinates. Radial samples are drawn from a CDF built from |R_nl|^2 and r^2. Angular samples are accepted according to |Y_lm|^2.</p>
-      </div>
+          <section id="limits" class="info-section">
+            <div class="card">
+              <h3>Limitations and interpretation</h3>
+              <ul>
+                <li>This is not a full time dependent many body solver. Superpositions are built from analytical hydrogenic states.</li>
+                <li>LDA orbitals are radial averages and do not include explicit electron correlation effects.</li>
+                <li>Dots show Monte Carlo samples, so low counts will look noisy.</li>
+                <li>Bubbles show an isosurface, which depends on the chosen threshold.</li>
+                <li>Spin, spin orbit coupling, and relativistic corrections are not modeled.</li>
+                <li>Excited state lifetimes and transitions are not simulated.</li>
+              </ul>
+              <p>Despite these limitations, the visualizer is physically grounded and useful for exploring orbital geometry, nodal structure, and interference effects.</p>
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
+    <script>
+      const navItems = Array.from(document.querySelectorAll(".nav-item"));
+      const sections = Array.from(document.querySelectorAll(".info-section"));
+      const sectionTitle = document.getElementById("sectionTitle");
+      const navSearch = document.getElementById("navSearch");
+
+      function showSection(target) {
+        navItems.forEach((item) => item.classList.toggle("active", item.dataset.target === target));
+        sections.forEach((section) => section.classList.toggle("active", section.id === target));
+        const activeItem = navItems.find((item) => item.dataset.target === target);
+        sectionTitle.textContent = activeItem ? activeItem.dataset.title : "Overview";
+      }
+
+      navItems.forEach((item) => {
+        item.addEventListener("click", () => showSection(item.dataset.target));
+      });
+
+      navSearch.addEventListener("input", (event) => {
+        const query = event.target.value.trim().toLowerCase();
+        navItems.forEach((item) => {
+          const text = item.textContent.toLowerCase();
+          item.style.display = text.includes(query) ? "block" : "none";
+        });
+      });
+
+      const diagramTabs = Array.from(document.querySelectorAll('[data-diagram-group=\"orbitals\"][data-diagram-tab]'));
+      const diagrams = Array.from(document.querySelectorAll('[data-diagram-group=\"orbitals\"][data-diagram]'));
+      diagramTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const key = tab.dataset.diagramTab;
+          diagramTabs.forEach((btn) => btn.classList.toggle("active", btn === tab));
+          diagrams.forEach((diagram) => diagram.classList.toggle("active", diagram.dataset.diagram === key));
+        });
+      });
+    </script>
   </body>
 </html>
 "##;
@@ -1846,6 +2552,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
     let want_super_psi =
         q.animated.unwrap_or(false) && requested_mode == ViewMode::Superposition;
     let want_phase = matches!(q.color_mode.as_deref(), Some("phase"));
+    let want_intensity = matches!(q.color_mode.as_deref(), Some("intensity"));
     let bubble = q.bubble.unwrap_or(false);
     let n2 = q.n2.unwrap_or(n);
     let l2 = q.l2.unwrap_or(l);
@@ -1923,6 +2630,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 delta_e: None,
                                 signs: if bubble { Some(vec![1; sign_count]) } else { None },
                                 phases: None,
+                                intensities: None,
                             };
                             return Json(out).into_response();
                         }
@@ -2029,6 +2737,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 delta_e: None,
                                 signs: if bubble { Some(vec![1; sign_count]) } else { None },
                                 phases: None,
+                                intensities: None,
                             };
                             return Json(out).into_response();
                         }
@@ -2081,6 +2790,19 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                             } else {
                                 None
                             };
+                            let intensities = if want_intensity {
+                                Some(intensities_from_radial_samples(
+                                    &samples,
+                                    &radial_r_sign,
+                                    &radial_val_sign,
+                                    l_used,
+                                    m_used,
+                                    RadialKind::R,
+                                    basis,
+                                ))
+                            } else {
+                                None
+                            };
                             let used_label = orbital.label.clone();
                             let mode_note = if exact {
                                 format!("OpenMX LDA {}", used_label)
@@ -2111,6 +2833,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 delta_e: None,
                                 signs,
                                 phases,
+                                intensities,
                             };
                             return Json(out).into_response();
                         }
@@ -2177,6 +2900,21 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                             } else {
                                 None
                             };
+                            let intensities = if want_intensity {
+                                Some(intensities_from_superposition_lda(
+                                    &samples,
+                                    &orb_a,
+                                    &orb_b,
+                                    m_a,
+                                    m_b,
+                                    mix,
+                                    time,
+                                    delta_e,
+                                    basis,
+                                ))
+                            } else {
+                                None
+                            };
                             let mut mode_note = String::from("OpenMX LDA superposition");
                             if !exact_a || !exact_b {
                                 mode_note.push_str(" (closest orbitals used)");
@@ -2211,6 +2949,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                                 delta_e: Some(delta_e),
                                 signs,
                                 phases,
+                                intensities,
                             };
                             return Json(out).into_response();
                         }
@@ -2284,6 +3023,19 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     } else {
                         None
                     };
+                    let intensities = if want_intensity {
+                        Some(intensities_from_radial_samples(
+                            &samples,
+                            &radial_r_sign,
+                            &radial_val_sign,
+                            l_used,
+                            m_used,
+                            RadialKind::Chi,
+                            basis,
+                        ))
+                    } else {
+                        None
+                    };
                     let used_label = orbital.label.clone();
                     let mode_note = if exact {
                         format!("PSlibrary {}", used_label)
@@ -2314,6 +3066,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                         delta_e: None,
                         signs,
                         phases,
+                        intensities,
                     };
                     return Json(out).into_response();
                 }
@@ -2343,6 +3096,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     delta_e: None,
                     signs: None,
                     phases: None,
+                    intensities: None,
                 };
                 return Json(out).into_response();
             } else {
@@ -2399,6 +3153,19 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
             } else {
                 None
             };
+            let intensities = if want_intensity {
+                Some(intensities_from_superposition_hydrogenic(
+                    &samples,
+                    q1,
+                    q2,
+                    mix,
+                    time,
+                    delta_e,
+                    basis,
+                ))
+            } else {
+                None
+            };
             let inv_z = 1.0 / z as f32;
             let scaled_max = if z > 1 { max_radius * inv_z } else { max_radius };
             let scaled_samples = if z > 1 {
@@ -2440,6 +3207,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                 delta_e: Some(delta_e),
                 signs,
                 phases,
+                intensities,
             };
             return Json(out).into_response();
         } else {
@@ -2480,6 +3248,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
                     delta_e: None,
                     signs: None,
                     phases: None,
+                    intensities: None,
                 };
             return Json(empty).into_response();
         }
@@ -2502,6 +3271,15 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
     };
     let phases = if want_phase {
         Some(phases_from_hydrogenic_samples(
+            &raw.iter().map(|(x, y, z)| [*x, *y, *z]).collect::<Vec<_>>(),
+            qn,
+            basis,
+        ))
+    } else {
+        None
+    };
+    let intensities = if want_intensity {
+        Some(intensities_from_hydrogenic_samples(
             &raw.iter().map(|(x, y, z)| [*x, *y, *z]).collect::<Vec<_>>(),
             qn,
             basis,
@@ -2539,6 +3317,7 @@ async fn samples(Query(q): Query<SampleQuery>) -> impl IntoResponse {
         delta_e: None,
         signs,
         phases,
+        intensities,
     };
     Json(out).into_response()
 }
@@ -2707,23 +3486,35 @@ fn generate_orbital_samples_from_radial(
 
     let cdf = build_radial_cdf(radial_r, radial_val, max_radius, radial_kind);
     let max_ang = max_angular_prob(l, m_l, basis);
+    let mut attempts = 0usize;
+    let max_attempts = num_samples.saturating_mul(300).max(1000);
 
-    while samples.len() < num_samples {
+    while samples.len() < num_samples && attempts < max_attempts {
+        attempts += 1;
         let r = sample_r(&cdf, radial_r, &mut rng);
         let phi = rng.gen::<f32>() * 2.0 * PI;
 
-        // Rejection sample theta from |Y_lm|^2
-        loop {
+        // Rejection sample theta from |Y_lm|^2 with a bounded loop
+        let mut accepted = false;
+        for _ in 0..256 {
             let cos_theta = rng.gen::<f32>() * 2.0 - 1.0;
             let theta = cos_theta.acos();
             let ang = angular_wavefunction_basis(theta, phi, l, m_l, basis);
-            if rng.gen::<f32>() < (ang * ang) / max_ang {
+            if !ang.is_finite() {
+                continue;
+            }
+            let p = (ang * ang) / max_ang;
+            if rng.gen::<f32>() < p.min(1.0) {
                 let x = r * theta.sin() * phi.cos();
                 let y = r * theta.sin() * phi.sin();
                 let z = r * theta.cos();
                 samples.push([x, y, z]);
+                accepted = true;
                 break;
             }
+        }
+        if !accepted {
+            continue;
         }
     }
 
@@ -3143,6 +3934,10 @@ fn phase_from_components(re: f32, im: f32) -> f32 {
     }
 }
 
+fn intensity_from_components(re: f32, im: f32) -> f32 {
+    re * re + im * im
+}
+
 fn signs_from_radial_samples(
     samples: &[[f32; 3]],
     radial_r: &[f32],
@@ -3210,6 +4005,40 @@ fn phases_from_radial_samples(
     out
 }
 
+fn intensities_from_radial_samples(
+    samples: &[[f32; 3]],
+    radial_r: &[f32],
+    radial_val: &[f32],
+    l: u32,
+    m_l: i32,
+    radial_kind: RadialKind,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let mut radial = interp_radial(r, radial_r, radial_val);
+        if matches!(radial_kind, RadialKind::Chi) && r > 1e-8 {
+            radial /= r;
+        }
+        let (y_re, y_im) = spherical_harmonic_basis(theta, phi, l, m_l, basis);
+        let psi_re = radial * y_re;
+        let psi_im = radial * y_im;
+        out.push(intensity_from_components(psi_re, psi_im));
+    }
+    out
+}
+
 fn signs_from_hydrogenic_samples(
     samples: &[[f32; 3]],
     qn: QuantumNumbers,
@@ -3259,6 +4088,33 @@ fn phases_from_hydrogenic_samples(
         let psi_re = radial * y_re;
         let psi_im = radial * y_im;
         out.push(phase_from_components(psi_re, psi_im));
+    }
+    out
+}
+
+fn intensities_from_hydrogenic_samples(
+    samples: &[[f32; 3]],
+    qn: QuantumNumbers,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let radial = radial_wavefunction(r, qn.n, qn.l);
+        let (y_re, y_im) = spherical_harmonic_basis(theta, phi, qn.l, qn.m_l, basis);
+        let psi_re = radial * y_re;
+        let psi_im = radial * y_im;
+        out.push(intensity_from_components(psi_re, psi_im));
     }
     out
 }
@@ -3335,6 +4191,45 @@ fn phases_from_superposition_hydrogenic(
         let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
         let psi2_im = b * r2 * (y2_re * phase_im + y2_im * phase_re);
         out.push(phase_from_components(psi1_re + psi2_re, psi1_im + psi2_im));
+    }
+    out
+}
+
+fn intensities_from_superposition_hydrogenic(
+    samples: &[[f32; 3]],
+    q1: QuantumNumbers,
+    q2: QuantumNumbers,
+    mix: f32,
+    time: f32,
+    delta_e: f32,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    let a = mix.sqrt();
+    let b = (1.0 - mix).sqrt();
+    let phase_re = (delta_e * time).cos();
+    let phase_im = -(delta_e * time).sin();
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let r1 = radial_wavefunction(r, q1.n, q1.l);
+        let r2 = radial_wavefunction(r, q2.n, q2.l);
+        let (y1_re, y1_im) = spherical_harmonic_basis(theta, phi, q1.l, q1.m_l, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, q2.l, q2.m_l, basis);
+        let psi1_re = a * r1 * y1_re;
+        let psi1_im = a * r1 * y1_im;
+        let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
+        let psi2_im = b * r2 * (y2_re * phase_im + y2_im * phase_re);
+        out.push(intensity_from_components(psi1_re + psi2_re, psi1_im + psi2_im));
     }
     out
 }
@@ -3419,6 +4314,47 @@ fn phases_from_superposition_lda(
     out
 }
 
+fn intensities_from_superposition_lda(
+    samples: &[[f32; 3]],
+    orb_a: &LdaOrbital,
+    orb_b: &LdaOrbital,
+    m_a: i32,
+    m_b: i32,
+    mix: f32,
+    time: f32,
+    delta_e: f32,
+    basis: AngularBasis,
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(samples.len());
+    let a = mix.sqrt();
+    let b = (1.0 - mix).sqrt();
+    let phase_re = (delta_e * time).cos();
+    let phase_im = -(delta_e * time).sin();
+    for p in samples {
+        let x = p[0];
+        let y = p[1];
+        let z = p[2];
+        let r = (x * x + y * y + z * z).sqrt();
+        if r <= 1e-8 {
+            out.push(0.0);
+            continue;
+        }
+        let cos_theta = (z / r).clamp(-1.0, 1.0);
+        let theta = cos_theta.acos();
+        let phi = y.atan2(x);
+        let r1 = interp_radial(r, &orb_a.radial_r, &orb_a.radial_rfn);
+        let r2 = interp_radial(r, &orb_b.radial_r, &orb_b.radial_rfn);
+        let (y1_re, y1_im) = spherical_harmonic_basis(theta, phi, orb_a.l, m_a, basis);
+        let (y2_re, y2_im) = spherical_harmonic_basis(theta, phi, orb_b.l, m_b, basis);
+        let psi1_re = a * r1 * y1_re;
+        let psi1_im = a * r1 * y1_im;
+        let psi2_re = b * r2 * (y2_re * phase_re - y2_im * phase_im);
+        let psi2_im = b * r2 * (y2_re * phase_im + y2_im * phase_re);
+        out.push(intensity_from_components(psi1_re + psi2_re, psi1_im + psi2_im));
+    }
+    out
+}
+
 fn build_radial_cdf(
     rs: &[f32],
     vs: &[f32],
@@ -3475,12 +4411,17 @@ fn sample_r<R: rand::Rng>(cdf: &[f32], rs: &[f32], rng: &mut R) -> f32 {
 fn max_angular_prob(l: u32, m_l: i32, basis: AngularBasis) -> f32 {
     use std::f32::consts::PI;
     let mut max_val = 0.0_f32;
-    for i in 0..720 {
-        let theta = (i as f32 + 0.5) / 720.0 * PI;
-        let ang = angular_wavefunction_basis(theta, 0.0, l, m_l, basis);
-        let p = ang * ang;
-        if p > max_val {
-            max_val = p;
+    let theta_steps = 180;
+    let phi_steps = if matches!(basis, AngularBasis::Complex) { 1 } else { 72 };
+    for i in 0..theta_steps {
+        let theta = (i as f32 + 0.5) / theta_steps as f32 * PI;
+        for j in 0..phi_steps {
+            let phi = (j as f32 + 0.5) / phi_steps as f32 * 2.0 * PI;
+            let ang = angular_wavefunction_basis(theta, phi, l, m_l, basis);
+            let p = ang * ang;
+            if p.is_finite() && p > max_val {
+                max_val = p;
+            }
         }
     }
     max_val.max(1e-8)
@@ -3499,3 +4440,5 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
+
+

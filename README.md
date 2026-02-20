@@ -20,8 +20,8 @@ For full documentation, open `http://127.0.0.1:3000/info`.
 - Single-orbital view using LDA or PSLibrary when available
 - Superposition mode with time evolution
 - Dots or bubbles rendering (smooth isosurfaces)
-- Real orbital basis option for classic p/d/f lobe shapes (Bubbles mode)
-- Dot color toggle for radial or phase visualization
+- Real orbital basis option for classic p/d/f lobe shapes (dots or bubbles)
+- Dot color toggle for radial, phase, or intensity visualization
 - 3D orbit controls, WASD translation, and zoom
 
 ## Controls
@@ -41,7 +41,10 @@ Bubble mode reconstructs a smooth surface from the sampled density. When a phase
 
 ## Color Meaning In Dots Mode
 
-Color indicates radial distance from the nucleus. The gradient runs from blue near the core through cyan and green to yellow at larger radii.
+Dot color depends on the selected mode:
+- Radial: distance from the nucleus. The gradient runs from blue near the core through cyan and green to yellow at larger radii.
+- Phase: hue encodes arg(psi) with h = (phase + pi) / (2 pi) * 360 degrees at fixed saturation/value.
+- Intensity: |psi|^2 mapped to a heat-style gradient from deep violet through red and gold to white.
 
 ## Data Sources And Approximations
 

@@ -44,7 +44,7 @@ The angular part Y_lm(theta,phi) is a spherical harmonic. It defines lobes and a
 
 Complex spherical harmonics include a phase factor exp(i m phi), so |Y_lm|^2 is independent of phi. This produces azimuthally symmetric shapes (rings and shells) for a single m state.
 
-Chemistry textbooks often show real orbitals formed by linear combinations of m and -m. These real combinations have explicit phi dependence and produce the familiar p, d, and f lobes. The visualizer includes a Real basis option that uses these combinations for orbital and superposition views.
+Chemistry textbooks often show real orbitals formed by linear combinations of m and -m. These real combinations have explicit phi dependence and produce the familiar p, d, and f lobes. The visualizer includes a Real basis option that uses these combinations for orbital and superposition views in both dots and bubbles modes.
 
 ## 6. Superposition And Time Dependence
 
@@ -71,6 +71,10 @@ Dots show Monte Carlo samples. Bubbles reconstruct a smooth surface from those s
 ## 9. Phase Visualization
 
 Phase is not directly observable in |psi|^2, but it is useful for understanding interference and orbital symmetry. In dot mode, the visualizer can color points by the complex phase angle arg(psi). For real orbitals, the phase is either 0 or pi, producing the familiar red/blue lobes. For complex orbitals and superposition, phase varies smoothly with position and time.
+
+Hue mapping: h = (phase + pi) / (2 pi) * 360 degrees, with saturation and value set to 0.95. Phase = -pi or +pi maps to red, phase = -pi/2 maps near yellow-green, phase = 0 maps to cyan, and phase = +pi/2 maps near purple-blue.
+
+Intensity mode maps |psi|^2 to a heat-style gradient from deep violet through red and gold to white. This highlights high probability regions and is not the same as phase.
 
 ## 10. Sampling Method
 
