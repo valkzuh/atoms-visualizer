@@ -171,11 +171,12 @@ const INDEX_HTML: &str = r##"<!doctype html>
       #panel.collapsed #panelInner { display: none; }
       #panel.collapsed .panel-meta { display: none; }
       #panel.collapsed .brand { font-size: 14px; }
-      #panelInner { flex: 1; overflow: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: rgba(88, 197, 204, 0.7) rgba(10, 14, 22, 0.4); }
+      #panelInner { flex: 1; overflow: auto; padding-left: 12px; padding-right: 6px; direction: rtl; scrollbar-width: thin; scrollbar-color: rgba(70, 215, 198, 0.65) rgba(8, 12, 18, 0.6); }
+      #panelInner > * { direction: ltr; }
       #panelInner::-webkit-scrollbar { width: 10px; }
-      #panelInner::-webkit-scrollbar-track { background: rgba(10, 14, 22, 0.4); border-radius: 999px; }
-      #panelInner::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(88, 197, 204, 0.85), rgba(59, 130, 246, 0.85)); border-radius: 999px; border: 2px solid rgba(10, 14, 22, 0.5); }
-      #panelInner::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(104, 224, 232, 0.95), rgba(99, 179, 255, 0.95)); }
+      #panelInner::-webkit-scrollbar-track { background: rgba(8, 12, 18, 0.6); border-radius: 999px; }
+      #panelInner::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(70, 215, 198, 0.85), rgba(74, 163, 255, 0.7)); border-radius: 999px; border: 2px solid rgba(8, 12, 18, 0.7); }
+      #panelInner::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(86, 235, 220, 0.95), rgba(120, 190, 255, 0.9)); }
       #infoButton { position: absolute; top: 16px; right: 16px; background: #111722; border: 1px solid #2b3545; color: var(--text); border-radius: 10px; padding: 8px 12px; font-size: 12px; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
       #infoButton:hover { border-color: var(--accent-3); color: #ffffff; }
       .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
@@ -215,7 +216,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
       #controls { margin-top: 6px; font-size: 12px; color: var(--muted); }
       #status { margin-top: 12px; font-size: 12px; color: #b7c3d3; }
       .hint { font-size: 11px; color: var(--muted-2); margin-top: 6px; }
-      #animControls { margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: #c9d1d9; }
+      #animControls { margin-top: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: #c9d1d9; }
+      #animatedRow { display: inline-flex; align-items: center; gap: 6px; }
       #animControls input[type="range"] { width: 140px; }
       #mixRow { margin-top: 8px; display: none; align-items: center; gap: 8px; font-size: 12px; color: #c9d1d9; flex-wrap: wrap; }
       #mixRow input[type="range"] { width: 140px; }
@@ -379,8 +381,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
               <button id="resetCamera">Reset camera</button>
             </div>
             <div id="animControls">
-              <label><input id="animated" type="checkbox" /> Animated (time evolution)</label>
-              <label>Speed</label>
+              <span id="animatedRow"><label><input id="animated" type="checkbox" /> Animated (time evolution)</label></span>
+              <label id="animSpeedLabel">Speed</label>
               <input id="animSpeed" type="range" min="0" max="3" step="0.05" value="1" />
               <span id="animSpeedVal">1.00x</span>
             </div>
@@ -471,6 +473,8 @@ const INDEX_HTML: &str = r##"<!doctype html>
       const pickPairButton = document.getElementById("pickPair");
       const resetCameraButton = document.getElementById("resetCamera");
       const animControls = document.getElementById("animControls");
+      const animatedRow = document.getElementById("animatedRow");
+      const animSpeedLabel = document.getElementById("animSpeedLabel");
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x0b1016);
 
@@ -566,7 +570,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
 
       function updateAnimUI() {
         animSpeedVal.textContent = animSpeed.toFixed(2) + "x";
-        animSpeedInput.disabled = !animateEnabled || animToggle.disabled;
+        const isSuper = modeSelect.value === "superposition";
+        const isOrbital = modeSelect.value === "orbital";
+        animSpeedInput.disabled = isSuper ? !animateEnabled : !isOrbital;
       }
 
       function initBubbles() {
@@ -993,7 +999,14 @@ const INDEX_HTML: &str = r##"<!doctype html>
           animToggle.checked = false;
         }
         animToggle.disabled = !superMode;
-        animControls.style.display = superMode ? "flex" : "none";
+        const showAnim = superMode || orbitalMode;
+        animControls.style.display = showAnim ? "flex" : "none";
+        if (animatedRow) {
+          animatedRow.style.display = superMode ? "inline-flex" : "none";
+        }
+        if (animSpeedLabel) {
+          animSpeedLabel.textContent = superMode ? "Speed" : "Spin speed";
+        }
         updateAnimUI();
         updateMixUI();
       }
